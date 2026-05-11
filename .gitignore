@@ -2,7 +2,9 @@
 
 # dependencies
 node_modules/
-
+.env*
+.claude/
+supabase/
 # Expo
 .expo/
 dist/
