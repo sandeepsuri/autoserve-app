@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
@@ -12,9 +13,11 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { VendorCard } from '@/components/VendorCard';
 import { colors, spacing, typography } from '@/constants/theme';
 import { listVendors } from '@/lib/vendors';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function DiscoverScreen() {
   const router = useRouter();
+  const { session } = useAuthStore();
   const [view, setView] = useState<'map' | 'list'>('map');
   const [query, setQuery] = useState('');
   const [mobileOnly, setMobileOnly] = useState(false);
@@ -40,7 +43,14 @@ export default function DiscoverScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <Text style={typography.titleLg}>Nearby service providers</Text>
+        <View style={styles.headerRow}>
+          <Text style={typography.titleLg}>Nearby service providers</Text>
+          {session ? (
+            <Pressable onPress={() => router.push('/(client)/profile')} hitSlop={12}>
+              <Ionicons name="person-circle-outline" size={28} color={colors.textPrimary} />
+            </Pressable>
+          ) : null}
+        </View>
         <Text style={styles.subtitle}>Search tires, oil changes, diagnostics, and mobile mechanics around you.</Text>
       </View>
 
@@ -97,6 +107,11 @@ export default function DiscoverScreen() {
 const styles = StyleSheet.create({
   header: {
     gap: spacing.sm,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   subtitle: {
     ...typography.bodyMd,
