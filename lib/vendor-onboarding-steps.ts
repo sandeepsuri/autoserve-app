@@ -42,6 +42,17 @@ export function getPrevStep(id: VendorOnboardingStepId): VendorOnboardingStep | 
 
 export function isDraftReadyFor(id: VendorOnboardingStepId, draft: VendorOnboardingDraft | null): boolean {
   if (!draft) return false;
+
+  const hasValidService = draft.services.some(
+    (service) =>
+      Boolean(service.title?.trim()) &&
+      Boolean(service.category) &&
+      typeof service.durationMinutes === 'number' &&
+      service.durationMinutes > 0 &&
+      typeof service.price === 'number' &&
+      service.price >= 0,
+  );
+
   switch (id) {
     case 'account-type':
       return Boolean(draft.businessType);
@@ -50,8 +61,8 @@ export function isDraftReadyFor(id: VendorOnboardingStepId, draft: VendorOnboard
     case 'location':
       return Boolean(draft.location?.address?.trim());
     case 'services':
-      return true;
+      return hasValidService;
     case 'review':
-      return Boolean(draft.businessType) && Boolean(draft.profile?.businessName?.trim());
+      return Boolean(draft.businessType) && Boolean(draft.profile?.businessName?.trim()) && hasValidService;
   }
 }

@@ -2,7 +2,15 @@ export type UserRole = 'client' | 'vendor';
 export type BusinessType = 'shop' | 'solo';
 export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
 export type BookingMode = 'shop' | 'mobile';
-export type ServiceCategory = 'tire' | 'oil' | 'brakes' | 'diagnostics' | 'repairs' | 'bodywork';
+export type ServiceCategory =
+  | 'tire'
+  | 'oil'
+  | 'brakes'
+  | 'diagnostics'
+  | 'repairs'
+  | 'bodywork'
+  | 'detailing'
+  | 'tint';
 export type VendorLocationMode = 'fixed' | 'mobile' | 'hybrid';
 
 export interface AppSession {
