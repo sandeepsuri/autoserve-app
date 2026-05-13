@@ -16,6 +16,7 @@ interface Props {
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   autoComplete?: string;
   secureTextEntry?: boolean;
+  onBlur?: () => void;
 }
 
 export function AppTextField({
@@ -31,6 +32,7 @@ export function AppTextField({
   keyboardType,
   autoCapitalize,
   secureTextEntry,
+  onBlur,
 }: Props) {
   const hasError = Boolean(errorText);
 
@@ -48,6 +50,7 @@ export function AppTextField({
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         secureTextEntry={secureTextEntry}
+        onBlur={onBlur}
         multiline={multiline}
         numberOfLines={multiline ? numberOfLines : undefined}
         textAlignVertical={multiline ? 'top' : undefined}
