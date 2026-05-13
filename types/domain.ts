@@ -61,6 +61,8 @@ export interface VendorOnboardingProfileDraft {
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
+  website?: string;
+  socialHandle?: string;
 }
 
 export interface VendorOnboardingLocationDraft {
