@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
+import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 import { AppSession, BusinessType, UserProfile, UserRole } from '@/types/domain';
 
 import { isSupabaseConfigured, supabase } from './supabase';
@@ -169,4 +170,5 @@ export async function signOut() {
     await supabase.auth.signOut();
   }
   useAuthStore.getState().clearAuth();
+  useVendorOnboardingStore.getState().reset();
 }

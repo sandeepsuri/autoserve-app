@@ -6,9 +6,33 @@ import { isSupabaseConfigured, supabase } from './supabase';
 
 export async function listVendorServices() {
   const ownerId = useAuthStore.getState().session?.userId;
-  return useDemoDataStore.getState().services.filter((service) =>
-    useDemoDataStore.getState().vendors.some((vendor) => vendor.id === service.vendorId && vendor.ownerId === ownerId)
-  );
+  if (!isSupabaseConfigured || !supabase) {
+    return useDemoDataStore.getState().services.filter((service) =>
+      useDemoDataStore.getState().vendors.some((vendor) => vendor.id === service.vendorId && vendor.ownerId === ownerId)
+    );
+  }
+
+  const vendorResult = await supabase.from('vendors').select('id').eq('owner_id', ownerId).maybeSingle();
+  if (vendorResult.error || !vendorResult.data) {
+    return [];
+  }
+
+  const servicesResult = await supabase.from('services').select('*').eq('vendor_id', vendorResult.data.id);
+  if (servicesResult.error || !servicesResult.data) {
+    return [];
+  }
+
+  return servicesResult.data.map((service) => ({
+    id: service.id,
+    vendorId: service.vendor_id,
+    title: service.title,
+    category: service.category,
+    description: service.description ?? undefined,
+    durationMinutes: service.duration_minutes,
+    price: service.price,
+    active: service.active ?? true,
+    image: service.image ?? undefined,
+  }));
 }
 
 export async function upsertVendorService(service: Service) {
@@ -22,6 +46,7 @@ export async function upsertVendorService(service: Service) {
     vendor_id: service.vendorId,
     title: service.title,
     category: service.category,
+    description: service.description ?? null,
     duration_minutes: service.durationMinutes,
     price: service.price,
     active: service.active,

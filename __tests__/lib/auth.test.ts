@@ -14,6 +14,14 @@ jest.mock('@/store/useDemoDataStore', () => ({
   demoReviewsState: [],
 }));
 
+jest.mock('@/store/useVendorOnboardingStore', () => ({
+  useVendorOnboardingStore: {
+    getState: jest.fn(() => ({
+      reset: jest.fn(),
+    })),
+  },
+}));
+
 jest.mock('@/lib/supabase', () => ({
   isSupabaseConfigured: true,
   supabase: {
@@ -33,7 +41,7 @@ import { signIn, signUp, signOut, setRole } from '@/lib/auth';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
 
-const auth = supabase!.auth as jest.Mocked<typeof supabase.auth>;
+const auth = supabase!.auth as jest.Mocked<NonNullable<typeof supabase>['auth']>;
 const mockFrom = supabase!.from as jest.Mock;
 const mockGetState = useAuthStore.getState as jest.Mock;
 const mockSetSessionData = jest.fn();

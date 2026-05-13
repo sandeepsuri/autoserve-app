@@ -31,7 +31,7 @@ const makeVendor = (overrides: Partial<VendorSummary> = {}): VendorSummary => ({
   mobileServiceEnabled: true,
   serviceRadiusMiles: 20,
   nextAvailable: 'Tomorrow',
-  heroImage: undefined,
+  heroImage: '',
   serviceCategories: ['oil', 'tire'],
   coordinates: { latitude: 34.05, longitude: -118.24 },
   ...overrides,
