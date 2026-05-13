@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { Href, useRouter } from 'expo-router';
 
 import { AppButton } from '@/components/AppButton';
 import { AppHeader } from '@/components/AppHeader';
@@ -34,7 +34,9 @@ export function OnboardingStepShell({
 
   const prevStep = getPrevStep(stepId);
   const nextStep = getNextStep(stepId);
-  const backFallback = prevStep?.route ?? '/(auth)/role';
+  const backTarget: Href = prevStep?.route ?? '/(auth)/role';
+
+  const handleBack = () => router.replace(backTarget);
 
   const handleContinue = async () => {
     if (!canContinue) return;
@@ -47,7 +49,7 @@ export function OnboardingStepShell({
       }
     }
     if (nextStep) {
-      router.push(nextStep.route);
+      router.replace(nextStep.route);
     }
   };
 
@@ -58,7 +60,7 @@ export function OnboardingStepShell({
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <AppHeader title={title} subtitle={subtitle} fallbackHref={backFallback} />
+        <AppHeader title={title} subtitle={subtitle} onBack={handleBack} />
         <OnboardingProgress stepId={stepId} />
         {children}
       </ScrollView>

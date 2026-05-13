@@ -9,11 +9,15 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 
 export default function VendorOnboardingEntry() {
-  const { draft, completedSteps, setDraft } = useVendorOnboardingStore();
+  const { draft, completedSteps, setDraft, reset } = useVendorOnboardingStore();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (draft) {
+    const session = useAuthStore.getState().session;
+    const isStale = Boolean(draft && session && draft.ownerId !== session.userId);
+    if (isStale) reset();
+
+    if (draft && !isStale) {
       setReady(true);
       return;
     }
