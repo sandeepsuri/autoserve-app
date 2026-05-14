@@ -1,6 +1,17 @@
 import { Href } from 'expo-router';
 
-import { VendorOnboardingDraft } from '@/types/domain';
+import { BusinessType, VendorLocationMode, VendorOnboardingDraft } from '@/types/domain';
+
+export const LOCATION_MODE_LABELS: Record<VendorLocationMode, string> = {
+  fixed: 'Fixed location',
+  mobile: 'Mobile service',
+  hybrid: 'Hybrid (shop + mobile)',
+};
+
+export const BUSINESS_TYPE_LABELS: Record<BusinessType, string> = {
+  shop: 'Business shop',
+  solo: 'Solo vendor',
+};
 
 export type VendorOnboardingStepId =
   | 'account-type'

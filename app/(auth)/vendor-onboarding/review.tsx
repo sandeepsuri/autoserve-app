@@ -1,12 +1,17 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/AppCard';
 import { OnboardingStepShell } from '@/components/onboarding/OnboardingStepShell';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import { submitVendorOnboarding } from '@/lib/vendor-onboarding';
-import { isDraftReadyFor } from '@/lib/vendor-onboarding-steps';
+import {
+  BUSINESS_TYPE_LABELS,
+  getStep,
+  isDraftReadyFor,
+  LOCATION_MODE_LABELS,
+} from '@/lib/vendor-onboarding-steps';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 import { ServiceCategory } from '@/types/domain';
 
@@ -23,13 +28,14 @@ const CATEGORY_LABELS: Record<ServiceCategory, string> = {
 
 export default function ReviewStep() {
   const router = useRouter();
-  const { draft, reset } = useVendorOnboardingStore();
+  const { draft } = useVendorOnboardingStore();
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const canSubmit = isDraftReadyFor('review', draft) && !submitting;
-  const services = draft?.services ?? [];
-  const activeServices = services.filter((service) => service.active ?? true);
-  const hiddenServices = services.filter((service) => !(service.active ?? true));
+  const services = useMemo(() => draft?.services ?? [], [draft?.services]);
+  const activeServices = useMemo(() => services.filter((s) => s.active ?? true), [services]);
+  const hiddenServices = useMemo(() => services.filter((s) => !(s.active ?? true)), [services]);
   const categorySummary = useMemo(() => {
     return Array.from(
       new Set(
@@ -42,15 +48,20 @@ export default function ReviewStep() {
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setSubmitError(null);
     try {
       await submitVendorOnboarding();
-      reset();
-      router.replace('/(vendor)');
+      router.replace('/(auth)/vendor-onboarding/complete');
     } catch (err) {
       console.warn('[onboarding] submit failed', err);
+      setSubmitError('Something went wrong. Check your details and try again.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const editSection = (stepId: 'account-type' | 'business-info' | 'location' | 'services') => {
+    router.push(getStep(stepId).route);
   };
 
   const row = (label: string, value: string | undefined) =>
@@ -70,26 +81,33 @@ export default function ReviewStep() {
       onContinue={handleSubmit}
       continueLabel={submitting ? 'Finishing…' : 'Finish setup'}
     >
+      {submitError ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{submitError}</Text>
+        </View>
+      ) : null}
+
       <AppCard style={styles.card}>
-        <Text style={typography.titleSm}>Account</Text>
-        {row('Type', draft?.businessType === 'shop' ? 'Business shop' : draft?.businessType === 'solo' ? 'Solo vendor' : undefined)}
+        <SectionEditRow title="Account" onEdit={() => editSection('business-info')} />
+        {row('Type', draft?.businessType ? BUSINESS_TYPE_LABELS[draft.businessType] : undefined)}
         {row('Business name', draft?.profile?.businessName)}
+        {row('Description', draft?.profile?.description)}
         {row('Contact', draft?.profile?.contactName)}
         {row('Email', draft?.profile?.contactEmail)}
         {row('Phone', draft?.profile?.contactPhone)}
       </AppCard>
 
       <AppCard style={styles.card}>
-        <Text style={typography.titleSm}>Location</Text>
+        <SectionEditRow title="Location" onEdit={() => editSection('location')} />
+        {row('Mode', draft?.location?.mode ? LOCATION_MODE_LABELS[draft.location.mode] : undefined)}
         {row('Address', draft?.location?.address)}
-        {row('Mode', draft?.location?.mode)}
         {draft?.location?.serviceRadiusMiles
-          ? row('Service radius', `${draft.location.serviceRadiusMiles} miles`)
+          ? row('Service radius', `${draft.location.serviceRadiusMiles} mi`)
           : null}
       </AppCard>
 
       <AppCard style={styles.card}>
-        <Text style={typography.titleSm}>Services</Text>
+        <SectionEditRow title="Services" onEdit={() => editSection('services')} />
         {services.length ? (
           <>
             <View style={styles.serviceSummaryRow}>
@@ -105,13 +123,26 @@ export default function ReviewStep() {
                 <View style={styles.serviceInfo}>
                   <Text style={styles.serviceTitle}>{service.title ?? 'Untitled service'}</Text>
                   <Text style={styles.serviceMeta}>
-                    {service.category ? CATEGORY_LABELS[service.category] : 'Uncategorized'} · {service.durationMinutes ?? 0} min · ${service.price ?? 0}
+                    {service.category ? CATEGORY_LABELS[service.category] : 'Uncategorized'} ·{' '}
+                    {service.durationMinutes ?? 0} min · ${service.price ?? 0}
                   </Text>
-                  {service.description ? <Text style={styles.serviceDescription}>{service.description}</Text> : null}
+                  {service.description ? (
+                    <Text style={styles.serviceDescription}>{service.description}</Text>
+                  ) : null}
                 </View>
-                <View style={[styles.statusPill, (service.active ?? true) ? styles.statusActive : styles.statusInactive]}>
-                  <Text style={[styles.statusText, (service.active ?? true) ? styles.statusTextActive : styles.statusTextInactive]}>
-                    {service.active ?? true ? 'Enabled' : 'Hidden'}
+                <View
+                  style={[
+                    styles.statusPill,
+                    (service.active ?? true) ? styles.statusActive : styles.statusInactive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusText,
+                      (service.active ?? true) ? styles.statusTextActive : styles.statusTextInactive,
+                    ]}
+                  >
+                    {(service.active ?? true) ? 'Enabled' : 'Hidden'}
                   </Text>
                 </View>
               </View>
@@ -125,9 +156,45 @@ export default function ReviewStep() {
   );
 }
 
+function SectionEditRow({ title, onEdit }: { title: string; onEdit: () => void }) {
+  return (
+    <View style={sectionStyles.row}>
+      <Text style={typography.titleSm}>{title}</Text>
+      <Pressable onPress={onEdit} style={sectionStyles.editButton} hitSlop={8}>
+        <Text style={sectionStyles.editLabel}>Edit</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const sectionStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  editButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  editLabel: {
+    ...typography.labelMd,
+    color: colors.surfaceBrand,
+  },
+});
+
 const styles = StyleSheet.create({
   card: {
     gap: spacing.sm,
+  },
+  errorBanner: {
+    backgroundColor: colors.surfaceSubtleOrange,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  errorText: {
+    ...typography.bodyMd,
+    color: colors.pending,
   },
   row: {
     flexDirection: 'row',
