@@ -1,5 +1,7 @@
+import { ensureProfileRow } from './auth';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
+import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 import {
   BusinessType,
   Coordinates,
@@ -437,7 +439,8 @@ export async function loadVendorOnboardingDraft(): Promise<VendorOnboardingDraft
 }
 
 export async function saveVendorOnboardingDraft(patch: VendorOnboardingDraftPatch): Promise<VendorOnboardingDraft> {
-  const { session } = requireSession();
+  requireSession();
+  await ensureProfileRow();
   const draft = mergeDraft(await loadVendorOnboardingDraft(), patch);
 
   if (!isSupabaseConfigured || !supabase) {
@@ -470,7 +473,19 @@ export async function saveVendorOnboardingServicesDraft(services: VendorOnboardi
 
 export async function submitVendorOnboarding(patch?: VendorOnboardingDraftPatch): Promise<VendorOnboardingDraft> {
   const { session, profile } = requireSession();
-  const baseDraft = patch ? await saveVendorOnboardingDraft(patch) : await loadVendorOnboardingDraft();
+  await ensureProfileRow();
+
+  const localDraft = useVendorOnboardingStore.getState().draft;
+  let baseDraft: VendorOnboardingDraft;
+  if (patch) {
+    baseDraft = await saveVendorOnboardingDraft(patch);
+  } else if (localDraft) {
+    await saveVendorOnboardingDraft({});
+    baseDraft = localDraft;
+  } else {
+    baseDraft = await loadVendorOnboardingDraft();
+  }
+
   const draft = mergeDraft(baseDraft, {
     completed: true,
     submittedAt: new Date().toISOString(),
@@ -512,6 +527,7 @@ export async function submitVendorOnboarding(patch?: VendorOnboardingDraftPatch)
       role: 'vendor',
       businessType: draft.businessType,
     });
+    useVendorOnboardingStore.getState().setDraft(draft);
     return draft;
   }
 
@@ -632,6 +648,7 @@ export async function submitVendorOnboarding(patch?: VendorOnboardingDraftPatch)
     role: 'vendor',
     businessType: draft.businessType,
   });
+  useVendorOnboardingStore.getState().setDraft(draft);
 
   return draft;
 }

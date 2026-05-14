@@ -147,6 +147,23 @@ export async function signInWithGoogle() {
   useAuthStore.getState().setSessionData(session, profile);
 }
 
+export async function ensureProfileRow(): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  const { session, profile } = useAuthStore.getState();
+  if (!session) return;
+
+  await supabase.from('profiles').upsert(
+    {
+      id: session.userId,
+      email: session.email,
+      full_name: profile?.fullName ?? session.email.split('@')[0],
+      role: profile?.role ?? null,
+      business_type: profile?.businessType ?? null,
+    },
+    { onConflict: 'id', ignoreDuplicates: false },
+  );
+}
+
 export async function setRole(role: UserRole, businessType?: BusinessType) {
   const { session, profile } = useAuthStore.getState();
   if (!session) throw new Error('No active session');
