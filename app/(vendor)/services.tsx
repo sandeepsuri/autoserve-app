@@ -9,8 +9,7 @@ import { AppCard } from '@/components/AppCard';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
-import { listVendorServices, removeVendorService, upsertVendorService } from '@/lib/vendor-admin';
-import { useDemoDataStore } from '@/store/useDemoDataStore';
+import { getVendorForOwner, listVendorServices, removeVendorService, upsertVendorService } from '@/lib/vendor-admin';
 
 const schema = z.object({
   title: z.string().min(2),
@@ -23,7 +22,11 @@ type FormValues = z.infer<typeof schema>;
 
 export default function VendorServicesScreen() {
   const queryClient = useQueryClient();
-  const vendorId = useDemoDataStore.getState().vendors[0]?.id;
+  const { data: vendor } = useQuery({
+    queryKey: ['vendor-self'],
+    queryFn: getVendorForOwner,
+  });
+  const vendorId = vendor?.id;
   const { data: services = [] } = useQuery({
     queryKey: ['vendor-services'],
     queryFn: listVendorServices,
