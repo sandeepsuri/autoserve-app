@@ -8,20 +8,16 @@ interface Props {
   subtitle?: string;
   fallbackHref?: Href;
   showBack?: boolean;
+  onBack?: () => void;
 }
 
-export function AppHeader({ title, subtitle, fallbackHref, showBack = true }: Props) {
+export function AppHeader({ title, subtitle, fallbackHref, showBack = true, onBack }: Props) {
   const router = useRouter();
 
   const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-
-    if (fallbackHref) {
-      router.replace(fallbackHref);
-    }
+    if (onBack) { onBack(); return; }
+    if (router.canGoBack()) { router.back(); return; }
+    if (fallbackHref) { router.replace(fallbackHref); }
   };
 
   return (

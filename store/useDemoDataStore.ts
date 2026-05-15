@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { demoBookings, demoProfiles, demoReviews, demoServices, demoVehicles, demoVendors } from '@/constants/mock-data';
-import { BookingRecord, Service, UserProfile, Vehicle, VendorSummary } from '@/types/domain';
+import { BookingRecord, Service, UserProfile, Vehicle, VendorOnboardingDraft, VendorSummary } from '@/types/domain';
 
 interface DemoDataState {
   profiles: UserProfile[];
@@ -11,6 +11,7 @@ interface DemoDataState {
   services: Service[];
   vehicles: Vehicle[];
   bookings: BookingRecord[];
+  onboardingDrafts: VendorOnboardingDraft[];
   addOrUpdateProfile: (profile: UserProfile) => void;
   addVehicle: (vehicle: Vehicle) => void;
   addBooking: (booking: BookingRecord) => void;
@@ -18,6 +19,8 @@ interface DemoDataState {
   upsertService: (service: Service) => void;
   removeService: (serviceId: string) => void;
   updateVendor: (vendorId: string, patch: Partial<VendorSummary>) => void;
+  upsertVendor: (vendor: VendorSummary) => void;
+  saveOnboardingDraft: (draft: VendorOnboardingDraft) => void;
 }
 
 export const useDemoDataStore = create<DemoDataState>()(
@@ -28,6 +31,7 @@ export const useDemoDataStore = create<DemoDataState>()(
       services: demoServices,
       vehicles: demoVehicles,
       bookings: demoBookings,
+      onboardingDrafts: [],
       addOrUpdateProfile: (profile) =>
         set((state) => ({
           profiles: state.profiles.some((item) => item.id === profile.id)
@@ -52,6 +56,18 @@ export const useDemoDataStore = create<DemoDataState>()(
         set((state) => ({
           vendors: state.vendors.map((vendor) => (vendor.id === vendorId ? { ...vendor, ...patch } : vendor)),
         })),
+      upsertVendor: (vendor) =>
+        set((state) => ({
+          vendors: state.vendors.some((item) => item.id === vendor.id)
+            ? state.vendors.map((item) => (item.id === vendor.id ? vendor : item))
+            : [vendor, ...state.vendors],
+        })),
+      saveOnboardingDraft: (draft) =>
+        set((state) => ({
+          onboardingDrafts: state.onboardingDrafts.some((item) => item.ownerId === draft.ownerId)
+            ? state.onboardingDrafts.map((item) => (item.ownerId === draft.ownerId ? draft : item))
+            : [draft, ...state.onboardingDrafts],
+        })),
     }),
     {
       name: 'autoserve-demo-data',
@@ -62,6 +78,7 @@ export const useDemoDataStore = create<DemoDataState>()(
         services: state.services,
         vehicles: state.vehicles,
         bookings: state.bookings,
+        onboardingDrafts: state.onboardingDrafts,
       }),
     }
   )

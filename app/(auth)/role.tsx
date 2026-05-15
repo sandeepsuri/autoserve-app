@@ -43,7 +43,14 @@ export default function RoleSelectionScreen() {
       <AppCard style={styles.card}>
         <Text style={typography.titleSm}>Vendor App</Text>
         <Text style={styles.body}>Set up your shop, manage services, define your mobile radius, and accept bookings.</Text>
-        <AppButton label="Continue as Vendor" variant="secondary" onPress={() => router.push('/(auth)/vendor-setup')} />
+        <AppButton
+          label="Continue as Vendor"
+          variant="secondary"
+          onPress={async () => {
+            await setRole('vendor');
+            router.push('/(auth)/vendor-setup');
+          }}
+        />
       </AppCard>
     </Screen>
   );

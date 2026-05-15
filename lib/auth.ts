@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
+import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 import { AppSession, BusinessType, UserProfile, UserRole } from '@/types/domain';
 
 import { isSupabaseConfigured, supabase } from './supabase';
@@ -146,6 +147,23 @@ export async function signInWithGoogle() {
   useAuthStore.getState().setSessionData(session, profile);
 }
 
+export async function ensureProfileRow(): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  const { session, profile } = useAuthStore.getState();
+  if (!session) return;
+
+  await supabase.from('profiles').upsert(
+    {
+      id: session.userId,
+      email: session.email,
+      full_name: profile?.fullName ?? session.email.split('@')[0],
+      role: profile?.role ?? null,
+      business_type: profile?.businessType ?? null,
+    },
+    { onConflict: 'id', ignoreDuplicates: false },
+  );
+}
+
 export async function setRole(role: UserRole, businessType?: BusinessType) {
   const { session, profile } = useAuthStore.getState();
   if (!session) throw new Error('No active session');
@@ -169,4 +187,5 @@ export async function signOut() {
     await supabase.auth.signOut();
   }
   useAuthStore.getState().clearAuth();
+  useVendorOnboardingStore.getState().reset();
 }

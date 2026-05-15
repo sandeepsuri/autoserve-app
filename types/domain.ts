@@ -2,7 +2,16 @@ export type UserRole = 'client' | 'vendor';
 export type BusinessType = 'shop' | 'solo';
 export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
 export type BookingMode = 'shop' | 'mobile';
-export type ServiceCategory = 'tire' | 'oil' | 'brakes' | 'diagnostics' | 'repairs' | 'bodywork';
+export type ServiceCategory =
+  | 'tire'
+  | 'oil'
+  | 'brakes'
+  | 'diagnostics'
+  | 'repairs'
+  | 'bodywork'
+  | 'detailing'
+  | 'tint';
+export type VendorLocationMode = 'fixed' | 'mobile' | 'hybrid';
 
 export interface AppSession {
   userId: string;
@@ -50,7 +59,60 @@ export interface Service {
   durationMinutes: number;
   price: number;
   active: boolean;
+  description?: string;
   image?: string;
+}
+
+export interface VendorOnboardingProfileDraft {
+  businessName?: string;
+  description?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  website?: string;
+  socialHandle?: string;
+}
+
+export interface VendorOnboardingLocationDraft {
+  mode?: VendorLocationMode;
+  address?: string;
+  coordinates?: Partial<Coordinates>;
+  serviceRadiusMiles?: number;
+}
+
+export interface VendorOnboardingServiceDraft {
+  id?: string;
+  title?: string;
+  category?: ServiceCategory;
+  description?: string;
+  durationMinutes?: number;
+  price?: number;
+  active?: boolean;
+}
+
+export interface VendorOnboardingDraft {
+  ownerId: string;
+  businessType?: BusinessType;
+  profile: VendorOnboardingProfileDraft;
+  location: VendorOnboardingLocationDraft;
+  services: VendorOnboardingServiceDraft[];
+  completed: boolean;
+  submittedAt?: string;
+  updatedAt?: string;
+}
+
+export interface VendorOnboardingDraftPatch {
+  businessType?: BusinessType;
+  profile?: Partial<VendorOnboardingProfileDraft>;
+  location?: {
+    mode?: VendorLocationMode;
+    address?: string;
+    coordinates?: Partial<Coordinates>;
+    serviceRadiusMiles?: number;
+  };
+  services?: VendorOnboardingServiceDraft[];
+  completed?: boolean;
+  submittedAt?: string;
 }
 
 export interface Review {

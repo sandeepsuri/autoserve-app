@@ -27,7 +27,14 @@ function RouteGate() {
   const inPublic = rootSegment === '(public)';
 
   if (inAuth && session && profile?.role === 'vendor') {
-    return <Redirect href="/(vendor)" />;
+    const onboardingDone = Boolean(profile.businessType);
+    const inOnboarding = segments[1] === 'vendor-onboarding' || segments[1] === 'vendor-setup';
+    if (!onboardingDone && !inOnboarding) {
+      return <Redirect href="/(auth)/vendor-onboarding" />;
+    }
+    if (onboardingDone && !inOnboarding) {
+      return <Redirect href="/(vendor)" />;
+    }
   }
 
   if (inAuth && session && profile?.role === 'client') {
@@ -40,6 +47,10 @@ function RouteGate() {
 
   if (inAuth && segments[1] === 'role' && !session) {
     return <Redirect href="/(auth)" />;
+  }
+
+  if (inVendor && session && profile?.role === 'vendor' && !profile.businessType) {
+    return <Redirect href="/(auth)/vendor-onboarding" />;
   }
 
   if (inVendor && (!session || profile?.role !== 'vendor')) {
