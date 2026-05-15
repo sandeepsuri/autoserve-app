@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
 import { getVendorForOwner, listVendorServices, removeVendorService, upsertVendorService } from '@/lib/vendor-admin';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const schema = z.object({
   title: z.string().min(2),
@@ -22,14 +23,17 @@ type FormValues = z.infer<typeof schema>;
 
 export default function VendorServicesScreen() {
   const queryClient = useQueryClient();
+  const ownerId = useAuthStore((state) => state.session?.userId);
   const { data: vendor } = useQuery({
-    queryKey: ['vendor-self'],
+    queryKey: ['vendor-self', ownerId],
     queryFn: getVendorForOwner,
+    enabled: Boolean(ownerId),
   });
   const vendorId = vendor?.id;
   const { data: services = [] } = useQuery({
-    queryKey: ['vendor-services'],
+    queryKey: ['vendor-services', ownerId],
     queryFn: listVendorServices,
+    enabled: Boolean(ownerId),
   });
 
   const { control, handleSubmit, reset } = useForm<FormValues>({
@@ -53,7 +57,7 @@ export default function VendorServicesScreen() {
       price: Number(values.price),
       active: true,
     });
-    await queryClient.invalidateQueries({ queryKey: ['vendor-services'] });
+    await queryClient.invalidateQueries({ queryKey: ['vendor-services', ownerId] });
     reset();
   });
 
@@ -92,7 +96,7 @@ export default function VendorServicesScreen() {
             <View style={styles.actions}>
               <AppButton label="Delete" variant="destructive" style={styles.actionButton} onPress={async () => {
                 await removeVendorService(service.id);
-                await queryClient.invalidateQueries({ queryKey: ['vendor-services'] });
+                await queryClient.invalidateQueries({ queryKey: ['vendor-services', ownerId] });
               }} />
             </View>
           </AppCard>

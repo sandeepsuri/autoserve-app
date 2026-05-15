@@ -17,6 +17,7 @@ import {
 } from '@/types/domain';
 
 import { isSupabaseConfigured, supabase } from './supabase';
+import { queryClient } from './query-client';
 
 type VendorRow = {
   id: string;
@@ -528,6 +529,10 @@ export async function submitVendorOnboarding(patch?: VendorOnboardingDraftPatch)
       businessType: draft.businessType,
     });
     useVendorOnboardingStore.getState().setDraft(draft);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['vendor-self', session.userId] }),
+      queryClient.invalidateQueries({ queryKey: ['vendor-services', session.userId] }),
+    ]);
     return draft;
   }
 
@@ -649,6 +654,10 @@ export async function submitVendorOnboarding(patch?: VendorOnboardingDraftPatch)
     businessType: draft.businessType,
   });
   useVendorOnboardingStore.getState().setDraft(draft);
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['vendor-self', session.userId] }),
+    queryClient.invalidateQueries({ queryKey: ['vendor-services', session.userId] }),
+  ]);
 
   return draft;
 }

@@ -8,12 +8,15 @@ import { MapPreview } from '@/components/MapPreview';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
 import { getVendorForOwner, updateVendorLocation } from '@/lib/vendor-admin';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function VendorLocationScreen() {
   const queryClient = useQueryClient();
+  const ownerId = useAuthStore((state) => state.session?.userId);
   const { data: vendor } = useQuery({
-    queryKey: ['vendor-self'],
+    queryKey: ['vendor-self', ownerId],
     queryFn: getVendorForOwner,
+    enabled: Boolean(ownerId),
   });
 
   const [radius, setRadius] = useState(vendor?.serviceRadiusMiles ?? 25);
@@ -68,7 +71,7 @@ export default function VendorLocationScreen() {
               mobileServiceEnabled: mobileEnabled,
               serviceRadiusMiles: radius,
             });
-            await queryClient.invalidateQueries({ queryKey: ['vendor-self'] });
+            await queryClient.invalidateQueries({ queryKey: ['vendor-self', ownerId] });
           } catch {
             setSaveError('Save failed — check your connection and try again.');
           } finally {
