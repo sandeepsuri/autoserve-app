@@ -34,7 +34,8 @@ export default function VendorBookingsScreen() {
       {filtered.length ? (
         filtered.map((booking) => (
           <AppCard key={booking.id} style={styles.bookingCard}>
-            <Text style={typography.titleSm}>{booking.id}</Text>
+            <Text style={typography.titleSm}>{booking.clientName ?? booking.id}</Text>
+            <Text style={styles.subtitle}>{booking.services[0]?.title ?? '—'}</Text>
             <Text style={styles.subtitle}>{booking.scheduledAt}</Text>
             <Text style={styles.subtitle}>Mode: {booking.bookingMode}</Text>
             {booking.status === 'pending' ? (

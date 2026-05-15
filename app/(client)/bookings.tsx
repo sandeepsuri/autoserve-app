@@ -1,38 +1,109 @@
 import { useQuery } from '@tanstack/react-query';
-import { StyleSheet, Text } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AppCard } from '@/components/AppCard';
 import { EmptyState } from '@/components/EmptyState';
+import { FilterChip } from '@/components/FilterChip';
 import { Screen } from '@/components/Screen';
-import { BookingSummaryCard } from '@/components/BookingSummaryCard';
-import { colors, typography } from '@/constants/theme';
+import { colors, spacing, typography } from '@/constants/theme';
 import { listBookingsForCurrentUser } from '@/lib/bookings';
+import { BookingRecord } from '@/types/domain';
+
+type Tab = 'upcoming' | 'history';
+
+function isUpcoming(status: BookingRecord['status']) {
+  return status === 'pending' || status === 'confirmed';
+}
+
+const STATUS_LABEL: Record<BookingRecord['status'], string> = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+
+const STATUS_COLORS: Record<BookingRecord['status'], { bg: string; fg: string }> = {
+  pending:   { bg: colors.surfaceSubtleOrange, fg: colors.surfaceAccent },
+  confirmed: { bg: '#EBF3FC',                  fg: colors.surfaceBrand },
+  completed: { bg: colors.surfaceSubtleGreen,  fg: colors.surfaceSuccess },
+  cancelled: { bg: '#FEE2E2',                  fg: colors.danger },
+};
 
 export default function ClientBookingsScreen() {
+  const router = useRouter();
+  const [tab, setTab] = useState<Tab>('upcoming');
+
   const { data: bookings = [] } = useQuery({
     queryKey: ['client-bookings'],
     queryFn: listBookingsForCurrentUser,
   });
+
+  const filtered = bookings.filter((b) =>
+    tab === 'upcoming' ? isUpcoming(b.status) : !isUpcoming(b.status),
+  );
 
   return (
     <Screen>
       <Text style={typography.titleLg}>Your bookings</Text>
       <Text style={styles.subtitle}>Track confirmed and pending service requests here.</Text>
 
-      {bookings.length ? (
-        bookings.map((booking) => (
-          <BookingSummaryCard
-            key={booking.id}
-            title={booking.id}
-            rows={[
-              { label: 'Status', value: booking.status },
-              { label: 'Mode', value: booking.bookingMode },
-              { label: 'Scheduled', value: booking.scheduledAt },
-              { label: 'Total', value: `$${booking.total.toFixed(2)}` },
-            ]}
-          />
-        ))
+      <View style={styles.tabs}>
+        <FilterChip label="Upcoming" active={tab === 'upcoming'} onPress={() => setTab('upcoming')} />
+        <FilterChip label="History"  active={tab === 'history'}  onPress={() => setTab('history')} />
+      </View>
+
+      {filtered.length ? (
+        filtered.map((booking) => {
+          const pill = STATUS_COLORS[booking.status];
+          const schedule =
+            booking.appointmentDate && booking.appointmentTime
+              ? `${booking.appointmentDate} · ${booking.appointmentTime}`
+              : booking.scheduledAt;
+          const location =
+            booking.bookingMode === 'mobile' && booking.mobileAddress
+              ? booking.mobileAddress
+              : 'At the shop';
+
+          return (
+            <Pressable key={booking.id} onPress={() => router.push(`/(client)/booking-detail/${booking.id}`)}>
+              <AppCard style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Text style={[typography.titleSm, styles.vendorName]} numberOfLines={1}>
+                    {booking.vendorName ?? 'Unknown vendor'}
+                  </Text>
+                  <View style={[styles.statusPill, { backgroundColor: pill.bg }]}>
+                    <Text style={[styles.statusText, { color: pill.fg }]}>{STATUS_LABEL[booking.status]}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.services} numberOfLines={1}>
+                  {booking.services.length
+                    ? booking.services.map((s) => s.title).join(' · ')
+                    : '—'}
+                </Text>
+
+                <View style={styles.metaRow}>
+                  <Text style={styles.meta}>{schedule}</Text>
+                  <Text style={styles.meta}>{`$${booking.total.toFixed(2)}`}</Text>
+                </View>
+
+                <Text style={styles.location}>{location}</Text>
+              </AppCard>
+            </Pressable>
+          );
+        })
+      ) : tab === 'upcoming' ? (
+        <EmptyState
+          title="No upcoming bookings"
+          body="Book a nearby shop or mobile mechanic to see your appointments here."
+        />
       ) : (
-        <EmptyState title="No bookings yet" body="Start with a nearby shop or mobile mechanic and your booking history will appear here." />
+        <EmptyState
+          title="No booking history yet"
+          body="Once you've completed an appointment, it'll show up here."
+        />
       )}
     </Screen>
   );
@@ -42,5 +113,46 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.bodyMd,
     color: colors.textSecondary,
+  },
+  tabs: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  card: {
+    gap: spacing.sm,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  vendorName: {
+    flex: 1,
+  },
+  statusPill: {
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 3,
+  },
+  statusText: {
+    ...typography.caption,
+    fontWeight: '600',
+  },
+  services: {
+    ...typography.bodyMd,
+    color: colors.textSecondary,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  meta: {
+    ...typography.bodyMd,
+    color: colors.textSecondary,
+  },
+  location: {
+    ...typography.caption,
+    color: colors.textTertiary,
   },
 });
