@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
@@ -12,8 +12,6 @@ import { colors, radius, spacing, typography } from '@/constants/theme';
 import { saveVendorOnboardingDraft } from '@/lib/vendor-onboarding';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 import { VendorLocationMode } from '@/types/domain';
-
-const DEFAULT_COORDS = { latitude: 34.0522, longitude: -118.2437 };
 
 const MODES: { id: VendorLocationMode; label: string; description: string }[] = [
   {
@@ -38,6 +36,7 @@ const isMobile = (m?: VendorLocationMode) => m === 'mobile' || m === 'hybrid';
 export default function LocationStep() {
   const { draft, patchDraft } = useVendorOnboardingStore();
   const [locating, setLocating] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
 
   const loc = draft?.location ?? {};
   const mode = loc.mode;
@@ -50,13 +49,6 @@ export default function LocationStep() {
   const hasMode = Boolean(mode);
   const needsRadius = isMobile(mode);
   const canContinue = hasMode && hasAddress && hasCoords && (!needsRadius || serviceRadius > 0);
-
-  // Seed map to a visible starting position when no coords exist yet.
-  useEffect(() => {
-    if (!hasCoords) {
-      patchDraft({ location: { coordinates: DEFAULT_COORDS } });
-    }
-  }, []);
 
   const selectMode = (id: VendorLocationMode) => {
     patchDraft({
@@ -94,6 +86,7 @@ export default function LocationStep() {
       patchDraft({
         location: { coordinates: newCoords, ...(newAddress ? { address: newAddress } : {}) },
       });
+      setGeocodeError(null);
     } catch {
       Alert.alert(
         'Location unavailable',
@@ -114,17 +107,34 @@ export default function LocationStep() {
             coordinates: { latitude: results[0].latitude, longitude: results[0].longitude },
           },
         });
+        setGeocodeError(null);
+      } else {
+        setGeocodeError("Couldn't locate this address. Use my current location or drag the pin to your spot.");
       }
     } catch {
-      // silent — user can drag the pin to correct position
+      setGeocodeError("Couldn't locate this address. Use my current location or drag the pin to your spot.");
     }
   };
 
   const handleContinue = async () => {
+    // Re-geocode as a safety net before persisting, in case the blur geocode was skipped.
+    if (hasAddress && hasCoords) {
+      try {
+        const results = await Location.geocodeAsync(address);
+        if (results.length) {
+          const fresh = { latitude: results[0].latitude, longitude: results[0].longitude };
+          const drift = Math.abs(fresh.latitude - coords!.latitude) + Math.abs(fresh.longitude - coords!.longitude);
+          // Only update if the drift is substantial (roughly more than ~0.01° ≈ 1 km).
+          if (drift > 0.01) {
+            patchDraft({ location: { coordinates: fresh } });
+          }
+        }
+      } catch {
+        // Leave the manually placed pin as-is.
+      }
+    }
     await saveVendorOnboardingDraft({ location: loc });
   };
-
-  const displayCoords = hasCoords ? coords! : DEFAULT_COORDS;
 
   return (
     <OnboardingStepShell
@@ -155,10 +165,14 @@ export default function LocationStep() {
           label="Address"
           required
           value={address}
-          onChangeText={(text) => patchDraft({ location: { address: text } })}
+          onChangeText={(text) => {
+            patchDraft({ location: { address: text } });
+            setGeocodeError(null);
+          }}
           onBlur={handleAddressBlur}
           placeholder="e.g. 1234 Main St, Los Angeles, CA 90001"
           helperText="Customers will see this on your shop page."
+          errorText={geocodeError ?? undefined}
         />
         <AppButton
           label={locating ? 'Locating…' : 'Use my current location'}
@@ -171,19 +185,27 @@ export default function LocationStep() {
       {/* Map pin */}
       <AppCard style={styles.card}>
         <SectionHeader title="Confirm your pin" />
-        <LocationPinMap
-          coords={displayCoords}
-          radiusMiles={needsRadius && hasCoords ? serviceRadius : undefined}
-          onDragEnd={(c) => patchDraft({ location: { coordinates: c } })}
-        />
-        <Text style={styles.pinLabel}>
-          {hasCoords
-            ? `Pin: ${coords!.latitude.toFixed(4)}, ${coords!.longitude.toFixed(4)}`
-            : 'Move the pin to your location'}
-        </Text>
-        {Platform.OS !== 'web' ? (
-          <Text style={styles.mapHelper}>Drag the pin to fine-tune your exact location.</Text>
-        ) : null}
+        {hasCoords ? (
+          <>
+            <LocationPinMap
+              coords={coords!}
+              radiusMiles={needsRadius ? serviceRadius : undefined}
+              onDragEnd={(c) => patchDraft({ location: { coordinates: c } })}
+            />
+            <Text style={styles.pinLabel}>
+              {`Pin: ${coords!.latitude.toFixed(4)}, ${coords!.longitude.toFixed(4)}`}
+            </Text>
+            {Platform.OS !== 'web' ? (
+              <Text style={styles.mapHelper}>Drag the pin to fine-tune your exact location.</Text>
+            ) : null}
+          </>
+        ) : (
+          <View style={styles.pinPlaceholder}>
+            <Text style={styles.pinPlaceholderText}>
+              Enter your address above or tap Use my current location to place a pin on the map.
+            </Text>
+          </View>
+        )}
       </AppCard>
 
       {/* Radius — mobile/hybrid only */}
@@ -210,7 +232,7 @@ export default function LocationStep() {
             />
           </View>
           <Text style={styles.mapHelper}>
-            We'll show your service area to nearby customers.
+            {"We'll show your service area to nearby customers."}
           </Text>
         </AppCard>
       ) : null}
@@ -306,6 +328,21 @@ const styles = StyleSheet.create({
   mapHelper: {
     ...typography.caption,
     color: colors.textTertiary,
+  },
+  pinPlaceholder: {
+    height: 120,
+    borderRadius: radius.md,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  pinPlaceholderText: {
+    ...typography.bodyMd,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   // Radius
   radiusDisplay: {
