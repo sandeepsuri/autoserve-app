@@ -8,12 +8,10 @@ jest.mock('@/store/useDemoDataStore', () => ({
   demoReviewsState: [],
 }));
 
-jest.mock('@/constants/mock-data', () => ({
-  availabilityByVendor: {},
-}));
+jest.mock('@/constants/mock-data', () => ({}));
 
 import { VendorSummary } from '@/types/domain';
-import { listVendors } from '@/lib/vendors';
+import { listVendors, getVendorDetail } from '@/lib/vendors';
 import { supabase } from '@/lib/supabase';
 
 const mockFrom = supabase!.from as jest.Mock;
@@ -54,6 +52,7 @@ const toDbRow = (v: VendorSummary) => ({
   service_categories: v.serviceCategories,
   latitude: v.coordinates.latitude,
   longitude: v.coordinates.longitude,
+  business_hours: [],
 });
 
 const mockSupabaseRows = (vendors: VendorSummary[]) => {
@@ -160,5 +159,64 @@ describe('listVendors — snake_case to camelCase mapping', () => {
     expect(v.reviewCount).toBe(124);
     expect(v.mobileServiceEnabled).toBe(true);
     expect(v.coordinates).toEqual({ latitude: 34.05, longitude: -118.24 });
+  });
+});
+
+// ─── getVendorDetail ──────────────────────────────────────────────────────────
+
+const makeChain = (overrides: Record<string, unknown> = {}) => {
+  const chain = {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    order: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    ...overrides,
+  };
+  return chain;
+};
+
+describe('getVendorDetail', () => {
+  it('returns vendor null when supabase row not found', async () => {
+    mockFrom.mockReturnValue(makeChain({ maybeSingle: jest.fn().mockResolvedValue({ data: null }) }));
+    const result = await getVendorDetail('nonexistent-id');
+    expect(result.vendor).toBeNull();
+    expect(result.services).toEqual([]);
+    expect(result.reviews).toEqual([]);
+  });
+
+  it('returns mapped vendor, services, reviews, and businessHours from supabase', async () => {
+    const vendorRow = {
+      ...toDbRow(makeVendor({ id: 'v1', name: 'Test Shop' })),
+      business_hours: [{ day: 'Mon', hours: '9-5' }],
+    };
+    const serviceRow = {
+      id: 's1', vendor_id: 'v1', title: 'Oil Change', category: 'oil',
+      duration_minutes: 30, price: 80, active: true, description: null, image: null,
+    };
+    const reviewRow = {
+      id: 'r1', booking_id: 'b1', vendor_id: 'v1', client_id: 'c1',
+      author: 'Alice', rating: 5, text: 'Great!', created_at: '2025-01-01',
+    };
+
+    let callCount = 0;
+    mockFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return makeChain({ maybeSingle: jest.fn().mockResolvedValue({ data: vendorRow }) });
+      }
+      if (callCount === 2) {
+        return makeChain({ eq: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ data: [serviceRow] }) }) });
+      }
+      return makeChain({ eq: jest.fn().mockReturnValue({ order: jest.fn().mockResolvedValue({ data: [reviewRow] }) }) });
+    });
+
+    const result = await getVendorDetail('v1');
+    expect(result.vendor?.id).toBe('v1');
+    expect(result.vendor?.name).toBe('Test Shop');
+    expect(result.services).toHaveLength(1);
+    expect(result.services[0].title).toBe('Oil Change');
+    expect(result.reviews).toHaveLength(1);
+    expect(result.reviews[0].author).toBe('Alice');
+    expect(result.businessHours).toEqual([{ day: 'Mon', hours: '9-5' }]);
   });
 });

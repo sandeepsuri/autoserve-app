@@ -1,4 +1,4 @@
-import { AvailabilitySlot, BookingRecord, Review, Service, UserProfile, Vehicle, VendorSummary } from '@/types/domain';
+import { BookingRecord, Review, Service, UserProfile, Vehicle, VendorSummary } from '@/types/domain';
 
 export const demoProfiles: UserProfile[] = [
   {
@@ -116,17 +116,3 @@ export const vehicleCatalog = {
 } as const;
 
 export const years = ['2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019'];
-
-export const availabilityByVendor: Record<string, AvailabilitySlot[]> = {
-  'vendor-riverside': [
-    { date: 'Tomorrow', label: 'Sat, May 10', times: ['9:30 AM', '11:00 AM', '2:00 PM'] },
-    { date: 'Sunday', label: 'Sun, May 11', times: ['10:30 AM', '1:30 PM'] },
-  ],
-  'vendor-precbn': [
-    { date: 'Today', label: 'Fri, May 9', times: ['4:15 PM', '6:00 PM'] },
-    { date: 'Tomorrow', label: 'Sat, May 10', times: ['8:30 AM', '12:00 PM'] },
-  ],
-  'vendor-body-paint': [
-    { date: 'Monday', label: 'Mon, May 12', times: ['10:00 AM', '3:30 PM'] },
-  ],
-};
