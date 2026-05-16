@@ -2,6 +2,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
 import { Vehicle } from '@/types/domain';
 
+
 import { isSupabaseConfigured, supabase } from './supabase';
 
 export async function listVehicles() {
@@ -55,6 +56,10 @@ export async function createVehicle(vehicle: Omit<Vehicle, 'id'>) {
     .single();
 
   if (error || !data) {
+    const isAuthenticated = Boolean(useAuthStore.getState().session);
+    if (isAuthenticated) {
+      throw new Error(error ? (error as { message?: string }).message ?? String(error) : 'Vehicle insert returned no data');
+    }
     useDemoDataStore.getState().addVehicle(newVehicle);
     return newVehicle;
   }

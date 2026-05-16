@@ -10,6 +10,7 @@ interface AuthState {
   profile: UserProfile | null;
   loading: boolean;
   guestMode: boolean;
+  guestClientId: string | null;
   postAuthPath: string | null;
   setGuestMode: (enabled: boolean) => void;
   setSessionData: (session: AppSession | null, profile: UserProfile | null) => void;
@@ -25,8 +26,15 @@ export const useAuthStore = create<AuthState>()(
       profile: null,
       loading: true,
       guestMode: false,
+      guestClientId: null,
       postAuthPath: null,
-      setGuestMode: (enabled) => set({ guestMode: enabled }),
+      setGuestMode: (enabled) =>
+        set((state) => ({
+          guestMode: enabled,
+          guestClientId: enabled
+            ? (state.guestClientId ?? `guest-${Date.now().toString(36)}`)
+            : null,
+        })),
       setSessionData: (session, profile) => set({ session, profile, loading: false }),
       setLoading: (loading) => set({ loading }),
       setPostAuthPath: (path) => set({ postAuthPath: path }),
@@ -39,6 +47,7 @@ export const useAuthStore = create<AuthState>()(
         session: state.session,
         profile: state.profile,
         guestMode: state.guestMode,
+        guestClientId: state.guestClientId,
         postAuthPath: state.postAuthPath,
       }),
     }
