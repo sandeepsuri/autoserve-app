@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { hydrateSupabaseSession, loadProfileForUser } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { AppSession, UserProfile } from '@/types/domain';
 
 interface AuthState {
@@ -43,8 +44,10 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'autoserve-auth',
       storage: createJSONStorage(() => AsyncStorage),
+      // session is intentionally excluded — Supabase's own AsyncStorage is the
+      // authoritative JWT store. Persisting session here too causes drift when
+      // clearAuth/signOut doesn't perfectly sync both stores.
       partialize: (state) => ({
-        session: state.session,
         profile: state.profile,
         guestMode: state.guestMode,
         guestClientId: state.guestClientId,
@@ -64,9 +67,32 @@ export async function initAuthListener() {
 
   if (!session) {
     useAuthStore.getState().setSessionData(null, useAuthStore.getState().profile);
-    return;
+  } else {
+    const profile = await loadProfileForUser(session.userId, session.email);
+    useAuthStore.getState().setSessionData(session, profile);
   }
 
-  const profile = await loadProfileForUser(session.userId, session.email);
-  useAuthStore.getState().setSessionData(session, profile);
+  // Keep Zustand's in-memory session in sync with the Supabase JWT for the
+  // lifetime of the app — this covers token refreshes and external sign-outs.
+  if (supabase) {
+    supabase.auth.onAuthStateChange(async (event, supabaseSession) => {
+      if (event === 'SIGNED_OUT' || !supabaseSession?.user) {
+        useAuthStore.getState().setSessionData(null, null);
+        return;
+      }
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        const nextSession: AppSession = {
+          userId: supabaseSession.user.id,
+          email: supabaseSession.user.email ?? 'unknown@autoserve.app',
+        };
+        const existing = useAuthStore.getState().session;
+        if (existing?.userId !== nextSession.userId) {
+          const profile = await loadProfileForUser(nextSession.userId, nextSession.email);
+          useAuthStore.getState().setSessionData(nextSession, profile);
+        } else {
+          useAuthStore.getState().setSessionData(nextSession, useAuthStore.getState().profile);
+        }
+      }
+    });
+  }
 }

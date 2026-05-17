@@ -2,6 +2,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
 import { BookingMode, BookingRecord, BookingServiceSnapshot, Service, VendorSummary, Vehicle } from '@/types/domain';
 
+import { fetchProfileNamesByIds } from './profiles';
 import { isSupabaseConfigured, supabase } from './supabase';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -28,6 +29,12 @@ export function getBookingByIdFromStore(bookingId: string): BookingRecord | null
   return useDemoDataStore.getState().bookings.find((booking) => booking.id === bookingId) ?? null;
 }
 
+function getDemoBookingsForVendorOwner(ownerId: string): BookingRecord[] {
+  const { bookings, vendors } = useDemoDataStore.getState();
+  const ownedVendorIds = vendors.filter((vendor) => vendor.ownerId === ownerId).map((vendor) => vendor.id);
+  return bookings.filter((booking) => ownedVendorIds.includes(booking.vendorId));
+}
+
 // ─── DB row mapping ───────────────────────────────────────────────────────────
 
 function rowToRecord(item: Record<string, unknown>): BookingRecord {
@@ -51,6 +58,7 @@ function rowToRecord(item: Record<string, unknown>): BookingRecord {
     vendorId: item.vendor_id as string,
     vendorName: (item.vendor_name as string | undefined) ?? undefined,
     vehicleId: item.vehicle_id as string,
+    vehicleLabel: (item.vehicle_label as string | undefined) ?? undefined,
     serviceIds,
     services,
     bookingMode: item.booking_mode as BookingMode,
@@ -85,26 +93,22 @@ export async function listBookingsForCurrentUser(): Promise<BookingRecord[]> {
   const isVendor = profile?.role === 'vendor';
 
   if (!isSupabaseConfigured || !supabase) {
-    const bookings = useDemoDataStore.getState().bookings;
     return isVendor
-      ? bookings.filter((booking) =>
-          useDemoDataStore.getState().vendors.some((vendor) => vendor.id === booking.vendorId && vendor.ownerId === session.userId)
-        )
-      : bookings.filter((booking) => booking.clientId === session.userId);
+      ? getDemoBookingsForVendorOwner(session.userId)
+      : useDemoDataStore.getState().bookings.filter((booking) => booking.clientId === session.userId);
   }
 
   let data: Record<string, unknown>[] | null = null;
   let error: unknown = null;
 
   if (isVendor) {
-    const { data: ownedVendors, error: vendorError } = await supabase.from('vendors').select('id').eq('owner_id', session.userId);
-    if (vendorError) {
-      error = vendorError;
-    } else {
-      const vendorIds = ownedVendors.map((v: { id: string }) => v.id);
-      const response = await supabase.from('bookings').select('*').in('vendor_id', vendorIds.length ? vendorIds : ['']);
-      data = response.data;
-      error = response.error;
+    const response = await supabase.rpc('bookings_for_current_vendor');
+    data = response.data as Record<string, unknown>[] | null;
+    error = response.error;
+    if (!error && data) {
+      const records = data.map(rowToRecord);
+      const names = await fetchProfileNamesByIds(records.map((r) => r.clientId));
+      return records.map((r) => ({ ...r, clientName: names[r.clientId] || r.clientName || 'Client' }));
     }
   } else {
     const response = await supabase.from('bookings').select('*').eq('client_id', session.userId);
@@ -114,6 +118,26 @@ export async function listBookingsForCurrentUser(): Promise<BookingRecord[]> {
 
   if (error || !data) return [];
   return data.map(rowToRecord);
+}
+
+export async function listBookingsForVendorOwner(ownerId?: string): Promise<BookingRecord[]> {
+  const { session } = useAuthStore.getState();
+  const resolvedOwnerId = ownerId ?? session?.userId;
+
+  if (!resolvedOwnerId) return [];
+
+  if (!isSupabaseConfigured || !supabase) {
+    return getDemoBookingsForVendorOwner(resolvedOwnerId);
+  }
+
+  const { data, error } = await supabase.rpc('bookings_for_current_vendor');
+  if (error) {
+    throw new Error(error.message ?? 'Failed to load vendor bookings');
+  }
+
+  const records = ((data ?? []) as Record<string, unknown>[]).map(rowToRecord);
+  const names = await fetchProfileNamesByIds(records.map((r) => r.clientId));
+  return records.map((r) => ({ ...r, clientName: names[r.clientId] || r.clientName || 'Client' }));
 }
 
 export async function getBookingById(bookingId: string): Promise<BookingRecord | null> {
@@ -154,6 +178,7 @@ export async function createBooking(input: Omit<BookingRecord, 'id' | 'createdAt
       service_ids: booking.serviceIds,
       services_snapshot: booking.services,
       vehicle_id: booking.vehicleId,
+      vehicle_label: booking.vehicleLabel ?? null,
       booking_mode: booking.bookingMode,
       mobile_address: booking.mobileAddress ?? null,
       scheduled_at: booking.scheduledAt,
@@ -184,7 +209,7 @@ export async function createBooking(input: Omit<BookingRecord, 'id' | 'createdAt
 
 export interface CreateBookingSelections {
   vendor: Pick<VendorSummary, 'id' | 'name'>;
-  vehicle: Pick<Vehicle, 'id'>;
+  vehicle: Pick<Vehicle, 'id'> & Partial<Pick<Vehicle, 'make' | 'model' | 'year' | 'nickname'>>;
   services: Pick<Service, 'id' | 'title' | 'category' | 'price' | 'durationMinutes'>[];
   scheduledDate: string;
   scheduledTime: string;
@@ -211,12 +236,19 @@ export async function createBookingFromSelections(input: CreateBookingSelections
   const serviceFee = Math.round(subtotal * 0.12 * 100) / 100;
   const total = Math.round((subtotal + serviceFee) * 100) / 100;
 
+  let vehicleLabel: string | undefined;
+  if (vehicle.year && vehicle.make && vehicle.model) {
+    const base = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+    vehicleLabel = vehicle.nickname ? `${vehicle.nickname} (${base})` : base;
+  }
+
   return createBooking({
     clientId,
     clientName,
     vendorId: vendor.id,
     vendorName: vendor.name,
     vehicleId: vehicle.id,
+    vehicleLabel,
     serviceIds: services.map((s) => s.id),
     services: snapshot,
     bookingMode,
