@@ -167,6 +167,7 @@ export interface BookingRecord {
   vendorId: string;
   vendorName?: string;
   vehicleId: string;
+  vehicleLabel?: string;
   serviceIds: string[];
   services: BookingServiceSnapshot[];
   bookingMode: BookingMode;
