@@ -9,22 +9,8 @@ import { BookingSummaryCard } from '@/components/BookingSummaryCard';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
+import { STATUS_COLORS, STATUS_LABEL } from '@/lib/booking-status';
 import { getBookingById, updateBookingStatus } from '@/lib/bookings';
-import { BookingRecord } from '@/types/domain';
-
-const STATUS_LABEL: Record<BookingRecord['status'], string> = {
-  pending: 'Pending',
-  confirmed: 'Confirmed',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-};
-
-const STATUS_COLORS: Record<BookingRecord['status'], { bg: string; fg: string }> = {
-  pending:   { bg: colors.surfaceSubtleOrange, fg: colors.surfaceAccent },
-  confirmed: { bg: '#EBF3FC',                  fg: colors.surfaceBrand },
-  completed: { bg: colors.surfaceSubtleGreen,  fg: colors.surfaceSuccess },
-  cancelled: { bg: '#FEE2E2',                  fg: colors.danger },
-};
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

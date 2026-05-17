@@ -6,6 +6,19 @@ jest.mock('@/lib/supabase', () => ({
 const mockAddBooking = jest.fn();
 const mockUpdateBookingStatus = jest.fn();
 let mockBookings: import('@/types/domain').BookingRecord[] = [];
+let mockVendors: import('@/types/domain').VendorSummary[] = [];
+let mockAuthState = {
+  session: { userId: 'client-1', email: 'client@example.com' },
+  profile: { role: 'client' as const },
+  guestMode: false,
+  guestClientId: null as string | null,
+};
+
+jest.mock('@/store/useAuthStore', () => ({
+  useAuthStore: {
+    getState: () => mockAuthState,
+  },
+}));
 
 jest.mock('@/store/useDemoDataStore', () => ({
   useDemoDataStore: {
@@ -13,9 +26,11 @@ jest.mock('@/store/useDemoDataStore', () => ({
       get bookings() {
         return mockBookings;
       },
+      get vendors() {
+        return mockVendors;
+      },
       addBooking: mockAddBooking,
       updateBookingStatus: mockUpdateBookingStatus,
-      vendors: [],
     }),
   },
 }));
@@ -26,6 +41,8 @@ import {
   getBookingByIdFromStore,
   getBookingsForClient,
   getBookingsForVendor,
+  listBookingsForCurrentUser,
+  listBookingsForVendorOwner,
   updateBookingStatus,
 } from '@/lib/bookings';
 
@@ -75,6 +92,13 @@ const makeRecord = (overrides: Partial<BookingRecord> = {}): BookingRecord => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockBookings = [];
+  mockVendors = [];
+  mockAuthState = {
+    session: { userId: 'client-1', email: 'client@example.com' },
+    profile: { role: 'client' },
+    guestMode: false,
+    guestClientId: null,
+  };
   mockAddBooking.mockImplementation((b: BookingRecord) => {
     mockBookings.push(b);
   });
@@ -195,6 +219,96 @@ describe('getBookingsForVendor', () => {
   it('returns empty array when no matching bookings', () => {
     mockBookings = [];
     expect(getBookingsForVendor('v1')).toHaveLength(0);
+  });
+});
+
+describe('listBookingsForCurrentUser', () => {
+  it('returns client bookings for a signed-in client in demo mode', async () => {
+    mockBookings = [
+      makeRecord({ id: 'b1', clientId: 'client-1' }),
+      makeRecord({ id: 'b2', clientId: 'client-2' }),
+    ];
+
+    await expect(listBookingsForCurrentUser()).resolves.toEqual([mockBookings[0]]);
+  });
+
+  it('returns guest bookings when no session exists in guest mode', async () => {
+    mockBookings = [
+      makeRecord({ id: 'b1', clientId: 'guest-1' }),
+      makeRecord({ id: 'b2', clientId: 'client-2' }),
+    ];
+    mockAuthState = {
+      session: null,
+      profile: null,
+      guestMode: true,
+      guestClientId: 'guest-1',
+    };
+
+    await expect(listBookingsForCurrentUser()).resolves.toEqual([mockBookings[0]]);
+  });
+});
+
+describe('listBookingsForVendorOwner', () => {
+  it('returns bookings linked to vendors owned by the signed-in vendor', async () => {
+    mockAuthState = {
+      session: { userId: 'vendor-owner-1', email: 'vendor@example.com' },
+      profile: { role: 'vendor' },
+      guestMode: false,
+      guestClientId: null,
+    };
+    mockVendors = [
+      {
+        id: 'v1',
+        ownerId: 'vendor-owner-1',
+        businessType: 'shop',
+        name: 'Riverside Auto',
+        description: 'desc',
+        address: '123 Main',
+        distanceMiles: 0,
+        rating: 5,
+        reviewCount: 1,
+        mobileServiceEnabled: false,
+        serviceRadiusMiles: 0,
+        nextAvailable: 'Soon',
+        heroImage: 'img',
+        serviceCategories: ['oil'],
+        coordinates: { latitude: 0, longitude: 0 },
+      },
+      {
+        id: 'v2',
+        ownerId: 'vendor-owner-2',
+        businessType: 'shop',
+        name: 'Other Auto',
+        description: 'desc',
+        address: '456 Side',
+        distanceMiles: 0,
+        rating: 4,
+        reviewCount: 1,
+        mobileServiceEnabled: false,
+        serviceRadiusMiles: 0,
+        nextAvailable: 'Soon',
+        heroImage: 'img',
+        serviceCategories: ['oil'],
+        coordinates: { latitude: 0, longitude: 0 },
+      },
+    ];
+    mockBookings = [
+      makeRecord({ id: 'b1', vendorId: 'v1' }),
+      makeRecord({ id: 'b2', vendorId: 'v2' }),
+    ];
+
+    await expect(listBookingsForVendorOwner()).resolves.toEqual([mockBookings[0]]);
+  });
+
+  it('returns an empty array when the vendor owns no vendors in demo mode', async () => {
+    mockAuthState = {
+      session: { userId: 'vendor-owner-1', email: 'vendor@example.com' },
+      profile: { role: 'vendor' },
+      guestMode: false,
+      guestClientId: null,
+    };
+
+    await expect(listBookingsForVendorOwner()).resolves.toEqual([]);
   });
 });
 

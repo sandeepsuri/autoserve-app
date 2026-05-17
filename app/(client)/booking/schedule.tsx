@@ -116,7 +116,12 @@ export default function BookingScheduleScreen() {
 
       const booking = await createBookingFromSelections({
         vendor: { id: vendor.id, name: vendor.name },
-        vehicle: { id: vehicleId },
+        vehicle: {
+          id: vehicleId,
+          make: draft.vehicleMake,
+          model: draft.vehicleModel,
+          year: draft.vehicleYear,
+        },
         services: selectedServices,
         scheduledDate: draft.scheduledDate!,
         scheduledTime: draft.scheduledTime!,
