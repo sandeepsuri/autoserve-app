@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -31,14 +31,29 @@ export default function VendorBookingsScreen() {
 
   const filtered = bookings.filter((b) => b.status === tab);
 
+  const invalidateAll = (bookingId: string) =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['vendor-bookings'] }),
+      queryClient.invalidateQueries({ queryKey: ['client-bookings'] }),
+      queryClient.invalidateQueries({ queryKey: ['booking-detail', bookingId] }),
+    ]);
+
   const accept = async (booking: BookingRecord) => {
-    await updateBookingStatus(booking.id, 'confirmed');
-    await queryClient.invalidateQueries({ queryKey: ['vendor-bookings'] });
+    try {
+      await updateBookingStatus(booking.id, 'confirmed');
+      await invalidateAll(booking.id);
+    } catch (err) {
+      Alert.alert('Could not accept booking', err instanceof Error ? err.message : String(err));
+    }
   };
 
   const reject = async (booking: BookingRecord) => {
-    await updateBookingStatus(booking.id, 'cancelled');
-    await queryClient.invalidateQueries({ queryKey: ['vendor-bookings'] });
+    try {
+      await updateBookingStatus(booking.id, 'cancelled');
+      await invalidateAll(booking.id);
+    } catch (err) {
+      Alert.alert('Could not reject booking', err instanceof Error ? err.message : String(err));
+    }
   };
 
   return (

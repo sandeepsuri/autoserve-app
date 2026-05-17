@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 
+import { subscribeBookingChanges } from '@/lib/bookings-realtime';
 import { queryClient } from '@/lib/query-client';
 import { initAuthListener, useAuthStore } from '@/store/useAuthStore';
 
@@ -77,6 +78,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     initAuthListener();
+  }, []);
+
+  useEffect(() => {
+    return subscribeBookingChanges(queryClient);
   }, []);
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppHeader } from '@/components/AppHeader';
@@ -60,9 +60,12 @@ export default function VendorBookingDetailScreen() {
       await updateBookingStatus(booking.id, status);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['vendor-bookings'] }),
+        queryClient.invalidateQueries({ queryKey: ['client-bookings'] }),
         queryClient.invalidateQueries({ queryKey: ['booking-detail', id] }),
       ]);
       router.back();
+    } catch (err) {
+      Alert.alert('Could not update booking', err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }

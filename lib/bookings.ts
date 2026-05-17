@@ -269,11 +269,32 @@ export async function createBookingFromSelections(input: CreateBookingSelections
 
 // ─── Update status ────────────────────────────────────────────────────────────
 
-export async function updateBookingStatus(bookingId: string, status: BookingRecord['status']): Promise<void> {
+export async function updateBookingStatus(bookingId: string, status: BookingRecord['status']): Promise<BookingRecord | null> {
   if (!isSupabaseConfigured || !supabase) {
     useDemoDataStore.getState().updateBookingStatus(bookingId, status);
-    return;
+    return getBookingByIdFromStore(bookingId);
   }
 
-  await supabase.from('bookings').update({ status, updated_at: new Date().toISOString() }).eq('id', bookingId);
+  const isVendor = useAuthStore.getState().profile?.role === 'vendor';
+
+  if (isVendor) {
+    const { data, error } = await supabase.rpc('update_booking_status_as_vendor', {
+      p_booking_id: bookingId,
+      p_status: status,
+    });
+    if (error) throw new Error(error.message ?? 'Failed to update booking status');
+    if (!data) throw new Error('Booking update did not return a row');
+    return rowToRecord(data as Record<string, unknown>);
+  }
+
+  // Client path — RLS uses `client_id = auth.uid()` (no subquery), works directly.
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', bookingId)
+    .select('*')
+    .maybeSingle();
+  if (error) throw new Error(error.message ?? 'Failed to update booking status');
+  if (!data) throw new Error('Booking update did not affect any rows');
+  return rowToRecord(data);
 }

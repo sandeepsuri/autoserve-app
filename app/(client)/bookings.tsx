@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/AppCard';
 import { EmptyState } from '@/components/EmptyState';
@@ -22,7 +22,7 @@ export default function ClientBookingsScreen() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('upcoming');
 
-  const { data: bookings = [] } = useQuery({
+  const { data: bookings = [], refetch, isRefetching } = useQuery({
     queryKey: ['client-bookings'],
     queryFn: listBookingsForCurrentUser,
   });
@@ -32,7 +32,7 @@ export default function ClientBookingsScreen() {
   );
 
   return (
-    <Screen>
+    <Screen refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.surfaceAccent} />}>
       <Text style={typography.titleLg}>Your bookings</Text>
       <Text style={styles.subtitle}>Track confirmed and pending service requests here.</Text>
 
