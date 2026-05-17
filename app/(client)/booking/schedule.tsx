@@ -152,7 +152,7 @@ export default function BookingScheduleScreen() {
   if (!draft.vendorId) {
     return (
       <Screen>
-        <AppHeader fallbackHref="/(public)/discover" />
+        <AppHeader fallbackHref="/(client)" />
         <EmptyState
           title="Select a vendor first"
           body="Start from a vendor page so we can load services and booking availability for the right shop."

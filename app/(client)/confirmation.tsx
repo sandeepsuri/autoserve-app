@@ -22,7 +22,7 @@ export default function ConfirmationScreen() {
   if (!bookingId) {
     return (
       <Screen>
-        <AppHeader fallbackHref="/(public)/discover" />
+        <AppHeader fallbackHref="/(client)" />
         <EmptyState title="Booking not found" body="We couldn’t load a booking reference for this confirmation screen." />
       </Screen>
     );
@@ -66,7 +66,7 @@ export default function ConfirmationScreen() {
       />
 
       <AppButton label="View My Bookings" variant="accent" onPress={() => router.replace('/(client)/bookings')} />
-      <AppButton label="Back to Discovery" variant="secondary" onPress={() => router.replace('/(public)/discover')} />
+      <AppButton label="Back to Discovery" variant="secondary" onPress={() => router.replace('/(client)')} />
     </Screen>
   );
 }

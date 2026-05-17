@@ -39,7 +39,7 @@ function RouteGate() {
   }
 
   if (inAuth && session && profile?.role === 'client') {
-    return <Redirect href="/(public)/discover" />;
+    return <Redirect href="/(client)" />;
   }
 
   if (session && !profile?.role && !inAuth) {

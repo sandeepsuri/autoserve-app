@@ -56,7 +56,7 @@ export default function BookingDetailsScreen() {
   if (!draft.vendorId) {
     return (
       <Screen>
-        <AppHeader fallbackHref="/(public)/discover" />
+        <AppHeader fallbackHref="/(client)" />
         <EmptyState
           title="Select a vendor first"
           body="Start from a vendor page so we can carry their services and availability into your booking."

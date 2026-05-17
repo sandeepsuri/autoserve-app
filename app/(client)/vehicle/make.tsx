@@ -15,7 +15,7 @@ export default function VehicleMakeScreen() {
 
   return (
     <Screen>
-      <AppHeader title="Step 01 of 03" subtitle="Select the vehicle make for this booking." fallbackHref="/(public)/discover" />
+      <AppHeader title="Step 01 of 03" subtitle="Select the vehicle make for this booking." fallbackHref="/(client)" />
 
       <View style={styles.grid}>
         {Object.keys(vehicleCatalog).map((make) => (
