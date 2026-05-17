@@ -35,7 +35,7 @@ export default function RoleSelectionScreen() {
           label="Continue as Client"
           onPress={async () => {
             await setRole('client');
-            router.replace((postAuthPath as never) || '/(public)/discover');
+            router.replace((postAuthPath as never) || '/(client)');
           }}
         />
       </AppCard>

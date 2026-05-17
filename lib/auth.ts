@@ -24,7 +24,11 @@ export async function hydrateSupabaseSession(): Promise<AppSession | null> {
 
   const { data } = await supabase.auth.getSession();
   const session = data.session;
-  if (!session?.user) return null;
+  if (!session?.user) {
+    // Defensively clear any stale Supabase session storage.
+    await supabase.auth.signOut().catch(() => {});
+    return null;
+  }
   return { userId: session.user.id, email: session.user.email ?? 'unknown@autoserve.app' };
 }
 

@@ -115,6 +115,14 @@ export interface VendorOnboardingDraftPatch {
   submittedAt?: string;
 }
 
+export interface BookingServiceSnapshot {
+  serviceId: string;
+  title: string;
+  category: ServiceCategory;
+  price: number;
+  durationMinutes: number;
+}
+
 export interface Review {
   id: string;
   bookingId: string;
@@ -139,6 +147,7 @@ export interface Vehicle {
 export interface BookingDraft {
   vendorId?: string;
   serviceId?: string;
+  serviceIds?: string[];
   vehicleId?: string;
   vehicleMake?: string;
   vehicleModel?: string;
@@ -147,22 +156,34 @@ export interface BookingDraft {
   scheduledDate?: string;
   scheduledTime?: string;
   mobileAddress?: string;
+  notes?: string;
+  photos?: string[];
 }
 
 export interface BookingRecord {
   id: string;
   clientId: string;
+  clientName?: string;
   vendorId: string;
-  serviceId: string;
+  vendorName?: string;
   vehicleId: string;
+  vehicleLabel?: string;
+  serviceIds: string[];
+  services: BookingServiceSnapshot[];
   bookingMode: BookingMode;
   mobileAddress?: string;
   scheduledAt: string;
+  appointmentDate?: string;
+  appointmentTime?: string;
   status: BookingStatus;
+  notes?: string;
+  photos?: string[];
   subtotal: number;
   serviceFee: number;
   total: number;
+  totalPrice: number;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface DiscoveryFilters {
@@ -171,10 +192,4 @@ export interface DiscoveryFilters {
   minimumRating: number;
   category: 'all' | ServiceCategory;
   maxDistanceMiles: number;
-}
-
-export interface AvailabilitySlot {
-  date: string;
-  label: string;
-  times: string[];
 }

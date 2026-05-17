@@ -6,12 +6,16 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { StatCard } from '@/components/StatCard';
 import { colors, spacing, typography } from '@/constants/theme';
-import { listBookingsForCurrentUser } from '@/lib/bookings';
+import { listBookingsForVendorOwner } from '@/lib/bookings';
+import { formatScheduledEST } from '@/lib/format';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function VendorDashboardScreen() {
-  const { data: bookings = [] } = useQuery({
-    queryKey: ['vendor-bookings'],
-    queryFn: listBookingsForCurrentUser,
+  const userId = useAuthStore((s) => s.session?.userId ?? 'anon');
+  const { data: bookings = [], error } = useQuery({
+    queryKey: ['vendor-bookings', 'vendor', userId],
+    queryFn: () => listBookingsForVendorOwner(userId),
+    enabled: userId !== 'anon',
   });
 
   const confirmed = bookings.filter((booking) => booking.status === 'confirmed').length;
@@ -33,11 +37,16 @@ export default function VendorDashboardScreen() {
         <Text style={styles.subtitle}>Update pricing, durations, and mobile-service availability to stay accurate in discovery.</Text>
       </AppCard>
 
-      {bookings.length ? (
+      {error ? (
+        <EmptyState
+          title="Could not load bookings"
+          body={error instanceof Error ? error.message : 'Please try again after refreshing the screen.'}
+        />
+      ) : bookings.length ? (
         bookings.slice(0, 3).map((booking) => (
           <AppCard key={booking.id}>
-            <Text style={typography.titleSm}>{booking.id}</Text>
-            <Text style={styles.subtitle}>{booking.scheduledAt}</Text>
+            <Text style={typography.titleSm}>{booking.clientName || 'Client'}</Text>
+            <Text style={styles.subtitle}>{formatScheduledEST(booking.scheduledAt)}</Text>
             <Text style={styles.status}>{booking.status.toUpperCase()}</Text>
           </AppCard>
         ))

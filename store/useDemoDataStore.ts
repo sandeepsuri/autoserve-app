@@ -42,7 +42,9 @@ export const useDemoDataStore = create<DemoDataState>()(
       addBooking: (booking) => set((state) => ({ bookings: [booking, ...state.bookings] })),
       updateBookingStatus: (bookingId, status) =>
         set((state) => ({
-          bookings: state.bookings.map((booking) => (booking.id === bookingId ? { ...booking, status } : booking)),
+          bookings: state.bookings.map((booking) =>
+            booking.id === bookingId ? { ...booking, status, updatedAt: new Date().toISOString() } : booking
+          ),
         })),
       upsertService: (service) =>
         set((state) => ({

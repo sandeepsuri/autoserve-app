@@ -8,7 +8,6 @@ import { useBookingDraftStore } from '@/store/useBookingDraftStore';
 export default function VehicleConfirmScreen() {
   const router = useRouter();
   const { draft } = useBookingDraftStore();
-  const updateDraft = useBookingDraftStore((state) => state.updateDraft);
 
   const saveVehicle = async () => {
     if (!draft.vehicleMake || !draft.vehicleModel || !draft.vehicleYear) {
@@ -16,7 +15,6 @@ export default function VehicleConfirmScreen() {
       return;
     }
 
-    updateDraft({ vehicleId: draft.vehicleId ?? `draft-vehicle-${Date.now()}` });
     router.push('/(client)/booking/service');
   };
 
@@ -33,7 +31,7 @@ export default function VehicleConfirmScreen() {
         ]}
       />
 
-      <AppButton label="Continue to Service Selection" variant="accent" onPress={saveVehicle} />
+      <AppButton label="Continue to Booking Details" variant="accent" onPress={saveVehicle} />
       <AppButton label="Unlock Auto Vehicle Detection" variant="secondary" onPress={() => router.push('/(public)/premium')} />
     </Screen>
   );

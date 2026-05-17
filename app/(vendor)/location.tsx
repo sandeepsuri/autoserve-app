@@ -1,11 +1,14 @@
+import * as Location from 'expo-location';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
-import { MapPreview } from '@/components/MapPreview';
+import { AppTextField } from '@/components/AppTextField';
+import { LocationPinMap } from '@/components/LocationPinMap';
 import { Screen } from '@/components/Screen';
+import { SectionHeader } from '@/components/SectionHeader';
 import { colors, spacing, typography } from '@/constants/theme';
 import { getVendorForOwner, updateVendorLocation } from '@/lib/vendor-admin';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -21,6 +24,9 @@ export default function VendorLocationScreen() {
 
   const [radius, setRadius] = useState(vendor?.serviceRadiusMiles ?? 25);
   const [mobileEnabled, setMobileEnabled] = useState(vendor?.mobileServiceEnabled ?? false);
+  const [address, setAddress] = useState(vendor?.address ?? '');
+  const [coords, setCoords] = useState(vendor?.coordinates ?? null as { latitude: number; longitude: number } | null);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -28,8 +34,25 @@ export default function VendorLocationScreen() {
     if (vendor) {
       setRadius(vendor.serviceRadiusMiles ?? 25);
       setMobileEnabled(vendor.mobileServiceEnabled ?? false);
+      setAddress(vendor.address ?? '');
+      setCoords(vendor.coordinates);
     }
   }, [vendor]);
+
+  const handleAddressBlur = async () => {
+    if (!address.trim()) return;
+    try {
+      const results = await Location.geocodeAsync(address);
+      if (results.length) {
+        setCoords({ latitude: results[0].latitude, longitude: results[0].longitude });
+        setGeocodeError(null);
+      } else {
+        setGeocodeError("Couldn't locate this address. Drag the pin to your exact location.");
+      }
+    } catch {
+      setGeocodeError("Couldn't locate this address. Drag the pin to your exact location.");
+    }
+  };
 
   if (!vendor) return null;
 
@@ -38,11 +61,38 @@ export default function VendorLocationScreen() {
       <Text style={typography.titleLg}>Location setup</Text>
       <Text style={styles.subtitle}>Set your primary shop location and define how far your mobile service should travel.</Text>
 
-      <MapPreview vendors={[vendor]} height={220} />
+      <AppCard style={styles.card}>
+        <SectionHeader title="Shop address" />
+        <AppTextField
+          label="Address"
+          required
+          value={address}
+          onChangeText={(text) => {
+            setAddress(text);
+            setGeocodeError(null);
+          }}
+          onBlur={handleAddressBlur}
+          placeholder="e.g. 1234 Main St, Los Angeles, CA 90001"
+          helperText="Type an address and the pin will update automatically."
+          errorText={geocodeError ?? undefined}
+        />
+      </AppCard>
+
+      {coords ? (
+        <AppCard style={styles.card}>
+          <SectionHeader title="Confirm your pin" />
+          <LocationPinMap
+            coords={coords}
+            onDragEnd={(c) => setCoords(c)}
+          />
+          <Text style={styles.pinLabel}>
+            {`Pin: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`}
+          </Text>
+        </AppCard>
+      ) : null}
 
       <AppCard style={styles.card}>
-        <Text style={typography.titleSm}>Shop address</Text>
-        <Text style={styles.subtitle}>{vendor.address}</Text>
+        <Text style={typography.titleSm}>Mobile service</Text>
         <AppButton
           label={mobileEnabled ? 'Disable mobile service' : 'Enable mobile service'}
           variant="secondary"
@@ -68,10 +118,13 @@ export default function VendorLocationScreen() {
           setSaveError(null);
           try {
             await updateVendorLocation(vendor.id, {
+              address,
+              coordinates: coords ?? vendor.coordinates,
               mobileServiceEnabled: mobileEnabled,
               serviceRadiusMiles: radius,
             });
             await queryClient.invalidateQueries({ queryKey: ['vendor-self', ownerId] });
+            await queryClient.invalidateQueries({ queryKey: ['vendor-detail', vendor.id] });
           } catch {
             setSaveError('Save failed — check your connection and try again.');
           } finally {
@@ -102,6 +155,11 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
+  },
+  pinLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   saveError: {
     ...typography.caption,

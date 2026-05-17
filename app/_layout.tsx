@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 
+import { subscribeBookingChanges } from '@/lib/bookings-realtime';
 import { queryClient } from '@/lib/query-client';
 import { initAuthListener, useAuthStore } from '@/store/useAuthStore';
 
@@ -38,7 +39,7 @@ function RouteGate() {
   }
 
   if (inAuth && session && profile?.role === 'client') {
-    return <Redirect href="/(public)/discover" />;
+    return <Redirect href="/(client)" />;
   }
 
   if (session && !profile?.role && !inAuth) {
@@ -77,6 +78,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     initAuthListener();
+  }, []);
+
+  useEffect(() => {
+    return subscribeBookingChanges(queryClient);
   }, []);
 
   useEffect(() => {
