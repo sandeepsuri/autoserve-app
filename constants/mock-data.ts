@@ -105,14 +105,3 @@ export const demoReviews: Review[] = [
 
 export const demoVehicles: Vehicle[] = [];
 export const demoBookings: BookingRecord[] = [];
-
-export const vehicleCatalog = {
-  Tesla: ['Model 3', 'Model Y', 'Model S'],
-  Toyota: ['Corolla', 'Camry', 'RAV4'],
-  BMW: ['3 Series', 'X5', 'i4'],
-  Ford: ['F-150', 'Mustang', 'Escape'],
-  Audi: ['A4', 'Q5', 'e-tron'],
-  Mercedes: ['C-Class', 'GLC', 'EQS'],
-} as const;
-
-export const years = ['2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019'];
