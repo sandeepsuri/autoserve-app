@@ -4,6 +4,7 @@ import { BookingMode, BookingRecord, BookingServiceSnapshot, Service, VendorSumm
 
 import { fetchProfileNamesByIds } from './profiles';
 import { isSupabaseConfigured, supabase } from './supabase';
+import { getVehicleById } from './vehicles';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -224,6 +225,10 @@ export interface CreateBookingSelections {
 export async function createBookingFromSelections(input: CreateBookingSelections): Promise<BookingRecord> {
   const { vendor, vehicle, services, scheduledDate, scheduledTime, bookingMode, mobileAddress, notes, photos, clientId, clientName } = input;
 
+  if (!vehicle.id) {
+    throw new Error('A vehicle is required to book a service.');
+  }
+
   const snapshot: BookingServiceSnapshot[] = services.map((s) => ({
     serviceId: s.id,
     title: s.title,
@@ -240,6 +245,13 @@ export async function createBookingFromSelections(input: CreateBookingSelections
   if (vehicle.year && vehicle.make && vehicle.model) {
     const base = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
     vehicleLabel = vehicle.nickname ? `${vehicle.nickname} (${base})` : base;
+  } else {
+    // id-only path: fetch saved vehicle for the label
+    const saved = await getVehicleById(vehicle.id);
+    if (saved) {
+      const base = `${saved.year} ${saved.make} ${saved.model}`;
+      vehicleLabel = saved.nickname ? `${saved.nickname} (${base})` : base;
+    }
   }
 
   return createBooking({

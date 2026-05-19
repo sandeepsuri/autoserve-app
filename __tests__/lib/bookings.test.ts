@@ -7,7 +7,12 @@ const mockAddBooking = jest.fn();
 const mockUpdateBookingStatus = jest.fn();
 let mockBookings: import('@/types/domain').BookingRecord[] = [];
 let mockVendors: import('@/types/domain').VendorSummary[] = [];
-let mockAuthState = {
+let mockAuthState: {
+  session: { userId: string; email: string } | null;
+  profile: { role: 'client' | 'vendor' } | null;
+  guestMode: boolean;
+  guestClientId: string | null;
+} = {
   session: { userId: 'client-1', email: 'client@example.com' },
   profile: { role: 'client' as const },
   guestMode: false,
@@ -20,6 +25,8 @@ jest.mock('@/store/useAuthStore', () => ({
   },
 }));
 
+let mockVehicles: import('@/types/domain').Vehicle[] = [];
+
 jest.mock('@/store/useDemoDataStore', () => ({
   useDemoDataStore: {
     getState: () => ({
@@ -28,6 +35,9 @@ jest.mock('@/store/useDemoDataStore', () => ({
       },
       get vendors() {
         return mockVendors;
+      },
+      get vehicles() {
+        return mockVehicles;
       },
       addBooking: mockAddBooking,
       updateBookingStatus: mockUpdateBookingStatus,
@@ -93,6 +103,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockBookings = [];
   mockVendors = [];
+  mockVehicles = [];
   mockAuthState = {
     session: { userId: 'client-1', email: 'client@example.com' },
     profile: { role: 'client' },
@@ -330,5 +341,61 @@ describe('updateBookingStatus', () => {
   it('delegates to demo store updateBookingStatus', async () => {
     await updateBookingStatus('b1', 'confirmed');
     expect(mockUpdateBookingStatus).toHaveBeenCalledWith('b1', 'confirmed');
+  });
+});
+
+// ─── createBookingFromSelections — vehicle validation ─────────────────────────
+
+describe('createBookingFromSelections — vehicle linkage', () => {
+  it('uses the provided vehicleId on the created booking record', async () => {
+    const booking = await createBookingFromSelections({
+      ...baseSelections,
+      vehicle: { id: 'saved-veh-1', make: 'Honda', model: 'Civic', year: '2022' },
+    });
+    expect(booking.vehicleId).toBe('saved-veh-1');
+  });
+
+  it('builds vehicleLabel from provided make/model/year', async () => {
+    const booking = await createBookingFromSelections({
+      ...baseSelections,
+      vehicle: { id: 'saved-veh-1', make: 'Honda', model: 'Civic', year: '2022' },
+    });
+    expect(booking.vehicleLabel).toBe('2022 Honda Civic');
+  });
+
+  it('includes nickname in vehicleLabel when provided', async () => {
+    const booking = await createBookingFromSelections({
+      ...baseSelections,
+      vehicle: { id: 'saved-veh-1', make: 'Honda', model: 'Civic', year: '2022', nickname: 'My Civic' },
+    });
+    expect(booking.vehicleLabel).toBe('My Civic (2022 Honda Civic)');
+  });
+
+  it('fetches vehicleLabel from saved store when only id is provided', async () => {
+    mockVehicles = [
+      {
+        id: 'saved-veh-2',
+        ownerId: 'client-1',
+        make: 'Toyota',
+        model: 'Camry',
+        year: '2020',
+        isDefault: true,
+      },
+    ];
+    const booking = await createBookingFromSelections({
+      ...baseSelections,
+      vehicle: { id: 'saved-veh-2' },
+    });
+    expect(booking.vehicleLabel).toBe('2020 Toyota Camry');
+    expect(booking.vehicleId).toBe('saved-veh-2');
+  });
+
+  it('throws a clear error when vehicle id is missing', async () => {
+    await expect(
+      createBookingFromSelections({
+        ...baseSelections,
+        vehicle: { id: '' },
+      })
+    ).rejects.toThrow('A vehicle is required to book a service.');
   });
 });
