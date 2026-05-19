@@ -123,7 +123,7 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
           onPress={() => {
             clearDraft();
             updateDraft({ vendorId: vendor.id });
-            router.push('/(client)/vehicle/make');
+            router.push('/(client)/booking/vehicle');
           }}
         />
       </View>

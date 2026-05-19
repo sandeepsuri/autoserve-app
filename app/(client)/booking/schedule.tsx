@@ -15,7 +15,7 @@ import { createBookingFromSelections } from '@/lib/bookings';
 import { ensureProfileRow } from '@/lib/auth';
 import { queryClient } from '@/lib/query-client';
 import { getVendorDetail } from '@/lib/vendors';
-import { createVehicle } from '@/lib/vehicles';
+import { listVehicles } from '@/lib/vehicles';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBookingDraftStore } from '@/store/useBookingDraftStore';
 
@@ -46,6 +46,12 @@ export default function BookingScheduleScreen() {
     enabled: Boolean(draft.vendorId),
   });
 
+  const { data: vehicles = [] } = useQuery({
+    queryKey: ['client-vehicles'],
+    queryFn: listVehicles,
+    enabled: Boolean(draft.vehicleId),
+  });
+
   const vendor = data?.vendor;
   const services = data?.services ?? [];
   const selectedServiceIds = draft.serviceIds ?? [];
@@ -53,16 +59,23 @@ export default function BookingScheduleScreen() {
   const subtotal = selectedServices.reduce((sum, service) => sum + service.price, 0);
   const serviceFee = Math.round(subtotal * 0.12 * 100) / 100;
   const total = Math.round((subtotal + serviceFee) * 100) / 100;
-  const vehicleLabel = `${draft.vehicleYear ?? ''} ${draft.vehicleMake ?? ''} ${draft.vehicleModel ?? ''}`.trim();
+
+  const savedVehicle = vehicles.find((v) => v.id === draft.vehicleId);
+  const vehicleLabel = savedVehicle
+    ? savedVehicle.nickname
+      ? `${savedVehicle.nickname} (${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model})`
+      : `${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model}`
+    : null;
+
   const dateOptions = getUpcomingDateOptions();
   const selectedDateLabel = dateOptions.find((option) => option.value === draft.scheduledDate)?.label ?? draft.scheduledDate ?? 'Choose a date';
   const canConfirm = Boolean(
     draft.vendorId &&
+      draft.vehicleId &&
       draft.bookingMode &&
       selectedServiceIds.length &&
       draft.scheduledDate &&
-      draft.scheduledTime &&
-      vehicleLabel
+      draft.scheduledTime
   );
 
   const toggleService = (serviceId: string) => {
@@ -97,31 +110,16 @@ export default function BookingScheduleScreen() {
     await ensureProfileRow();
 
     try {
-      let vehicleId = draft.vehicleId;
-      if (!vehicleId && draft.vehicleMake && draft.vehicleModel && draft.vehicleYear) {
-        const vehicle = await createVehicle({
-          ownerId: clientId,
-          make: draft.vehicleMake,
-          model: draft.vehicleModel,
-          year: draft.vehicleYear,
-          isDefault: true,
-        });
-        vehicleId = vehicle.id;
-      }
+      const vehicleId = draft.vehicleId;
 
       if (!vehicleId) {
-        Alert.alert('Vehicle required', 'Please finish the vehicle selection flow before confirming.');
+        Alert.alert('Vehicle required', 'Please go back and select a vehicle before confirming.');
         return;
       }
 
       const booking = await createBookingFromSelections({
         vendor: { id: vendor.id, name: vendor.name },
-        vehicle: {
-          id: vehicleId,
-          make: draft.vehicleMake,
-          model: draft.vehicleModel,
-          year: draft.vehicleYear,
-        },
+        vehicle: { id: vehicleId },
         services: selectedServices,
         scheduledDate: draft.scheduledDate!,
         scheduledTime: draft.scheduledTime!,
@@ -173,7 +171,7 @@ export default function BookingScheduleScreen() {
         title="Booking request"
         rows={[
           { label: 'Vendor', value: vendor?.name ?? (isLoading ? 'Loading…' : 'Selected vendor') },
-          { label: 'Vehicle', value: vehicleLabel || 'Vehicle required' },
+          { label: 'Vehicle', value: vehicleLabel ?? 'Vehicle required' },
           { label: 'Service type', value: draft.bookingMode === 'mobile' ? 'Mobile Service' : 'Shop Visit' },
           {
             label: 'Problem',

@@ -27,6 +27,13 @@ export default function ClientLayout() {
         }}
       />
       <Tabs.Screen
+        name="vehicles"
+        options={{
+          title: 'Garage',
+          tabBarIcon: ({ color, size }) => <Ionicons name="car-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
@@ -36,13 +43,16 @@ export default function ClientLayout() {
 
       <Tabs.Screen name="shop/[id]"           options={{ href: null }} />
       <Tabs.Screen name="booking-detail/[id]" options={{ href: null }} />
+      <Tabs.Screen name="booking/vehicle"     options={{ href: null }} />
       <Tabs.Screen name="booking/service"     options={{ href: null }} />
       <Tabs.Screen name="booking/schedule"    options={{ href: null }} />
       <Tabs.Screen name="booking/review"      options={{ href: null }} />
       <Tabs.Screen name="vehicle/make"        options={{ href: null }} />
       <Tabs.Screen name="vehicle/model"       options={{ href: null }} />
       <Tabs.Screen name="vehicle/year"        options={{ href: null }} />
-      <Tabs.Screen name="vehicle/confirm"     options={{ href: null }} />
+      <Tabs.Screen name="vehicle/confirm"      options={{ href: null }} />
+      <Tabs.Screen name="vehicle/garage-add"  options={{ href: null }} />
+      <Tabs.Screen name="vehicle/garage-edit" options={{ href: null }} />
       <Tabs.Screen name="confirmation"        options={{ href: null }} />
     </Tabs>
   );

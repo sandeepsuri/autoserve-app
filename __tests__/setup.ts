@@ -13,3 +13,7 @@ jest.mock('expo-web-browser', () => ({
 jest.mock('expo-auth-session', () => ({
   makeRedirectUri: jest.fn(() => 'autoserve://'),
 }));
+
+if (!global.WebSocket) {
+  global.WebSocket = class MockWebSocket {} as unknown as typeof WebSocket;
+}

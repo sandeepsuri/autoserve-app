@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { listVehicles } from '@/lib/vehicles';
 import { getVendorDetail } from '@/lib/vendors';
 import { useBookingDraftStore } from '@/store/useBookingDraftStore';
 import { BookingMode } from '@/types/domain';
@@ -46,12 +47,25 @@ export default function BookingDetailsScreen() {
     enabled: Boolean(draft.vendorId),
   });
 
+  const { data: vehicles = [] } = useQuery({
+    queryKey: ['client-vehicles'],
+    queryFn: listVehicles,
+    enabled: Boolean(draft.vehicleId),
+  });
+
   const vendor = data?.vendor;
   const availableModes = MODE_OPTIONS.filter((option) => option.value === 'shop' || vendor?.mobileServiceEnabled);
   const selectedMode = draft.bookingMode ?? 'shop';
   const selectedModeMeta = MODE_OPTIONS.find((option) => option.value === selectedMode);
-  const vehicleLabel = `${draft.vehicleYear ?? ''} ${draft.vehicleMake ?? ''} ${draft.vehicleModel ?? ''}`.trim();
-  const canContinue = Boolean(vendor && vehicleLabel && selectedMode);
+
+  const savedVehicle = vehicles.find((v) => v.id === draft.vehicleId);
+  const vehicleLabel = savedVehicle
+    ? savedVehicle.nickname
+      ? `${savedVehicle.nickname} (${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model})`
+      : `${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model}`
+    : null;
+
+  const canContinue = Boolean(vendor && draft.vehicleId && selectedMode);
 
   if (!draft.vendorId) {
     return (
@@ -70,14 +84,14 @@ export default function BookingDetailsScreen() {
       <AppHeader
         title="1. Booking details"
         subtitle="Confirm the vehicle, choose how the service happens, and share any issue details for the mechanic."
-        fallbackHref="/(client)/vehicle/confirm"
+        fallbackHref="/(client)/booking/vehicle"
       />
 
       <BookingSummaryCard
         title="Selected vehicle"
         rows={[
           { label: 'Vendor', value: vendor?.name ?? (isLoading ? 'Loading…' : 'Selected vendor') },
-          { label: 'Vehicle', value: vehicleLabel || 'Complete the vehicle step first' },
+          { label: 'Vehicle', value: vehicleLabel ?? 'Complete the vehicle step first' },
         ]}
       />
 

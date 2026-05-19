@@ -140,6 +140,10 @@ export interface Vehicle {
   make: string;
   model: string;
   year: string;
+  trim?: string;
+  plate?: string;
+  color?: string;
+  photoUrl?: string;
   nickname?: string;
   isDefault?: boolean;
 }

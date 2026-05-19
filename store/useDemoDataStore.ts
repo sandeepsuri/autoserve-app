@@ -14,6 +14,9 @@ interface DemoDataState {
   onboardingDrafts: VendorOnboardingDraft[];
   addOrUpdateProfile: (profile: UserProfile) => void;
   addVehicle: (vehicle: Vehicle) => void;
+  updateVehicle: (id: string, patch: Partial<Omit<Vehicle, 'id' | 'ownerId'>>) => void;
+  removeVehicle: (id: string) => void;
+  clearVehicleDefaults: (ownerId: string) => void;
   addBooking: (booking: BookingRecord) => void;
   updateBookingStatus: (bookingId: string, status: BookingRecord['status']) => void;
   upsertService: (service: Service) => void;
@@ -39,6 +42,16 @@ export const useDemoDataStore = create<DemoDataState>()(
             : [...state.profiles, profile],
         })),
       addVehicle: (vehicle) => set((state) => ({ vehicles: [vehicle, ...state.vehicles] })),
+      updateVehicle: (id, patch) =>
+        set((state) => ({
+          vehicles: state.vehicles.map((v) => (v.id === id ? { ...v, ...patch } : v)),
+        })),
+      removeVehicle: (id) =>
+        set((state) => ({ vehicles: state.vehicles.filter((v) => v.id !== id) })),
+      clearVehicleDefaults: (ownerId) =>
+        set((state) => ({
+          vehicles: state.vehicles.map((v) => (v.ownerId === ownerId ? { ...v, isDefault: false } : v)),
+        })),
       addBooking: (booking) => set((state) => ({ bookings: [booking, ...state.bookings] })),
       updateBookingStatus: (bookingId, status) =>
         set((state) => ({
