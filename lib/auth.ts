@@ -122,7 +122,7 @@ export async function signInWithGoogle() {
     const profile = { id: session.userId, email: session.email, fullName: 'Google Driver' };
     await persistProfile(profile);
     useAuthStore.getState().setSessionData(session, profile);
-    return;
+    return true;
   }
 
   // TODO: Blocked by Expo Go limitation — verify after switching to a dev build.
@@ -137,7 +137,7 @@ export async function signInWithGoogle() {
 
   if (error) throw error;
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  if (result.type !== 'success') return;
+  if (result.type !== 'success') return false;
 
   const url = result.url;
   const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(url);
@@ -149,6 +149,7 @@ export async function signInWithGoogle() {
   };
   const profile = await loadProfileForUser(session.userId, session.email);
   useAuthStore.getState().setSessionData(session, profile);
+  return true;
 }
 
 export async function ensureProfileRow(): Promise<void> {

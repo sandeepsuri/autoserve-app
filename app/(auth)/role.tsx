@@ -12,7 +12,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 export default function RoleSelectionScreen() {
   const router = useRouter();
-  const { session, postAuthPath } = useAuthStore();
+  const { session, postAuthPath, setPostAuthPath } = useAuthStore();
 
   useEffect(() => {
     if (!session) router.replace('/(auth)');
@@ -34,8 +34,10 @@ export default function RoleSelectionScreen() {
         <AppButton
           label="Continue as Client"
           onPress={async () => {
+            const nextPath = postAuthPath;
             await setRole('client');
-            router.replace((postAuthPath as never) || '/(client)');
+            setPostAuthPath(null);
+            router.replace((nextPath as never) || '/(client)');
           }}
         />
       </AppCard>

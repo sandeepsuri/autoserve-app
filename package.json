@@ -7,6 +7,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "build:android:preview": "npx eas-cli build --profile preview --platform android",
+    "build:ios:preview": "npx eas-cli build --profile preview --platform ios",
+    "build:preview": "npx eas-cli build --profile preview --platform all",
     "lint": "expo lint",
     "test": "jest"
   },
