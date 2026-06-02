@@ -26,6 +26,7 @@ export default function AuthScreen() {
   const [confirmationPending, setConfirmationPending] = useState(false);
   const postAuthPath = useAuthStore((state) => state.postAuthPath);
   const setGuestMode = useAuthStore((state) => state.setGuestMode);
+  const setPostAuthPath = useAuthStore((state) => state.setPostAuthPath);
 
   const { control, handleSubmit, formState: { isSubmitting } } = useForm<FormValues>({
     defaultValues: {
@@ -37,9 +38,11 @@ export default function AuthScreen() {
   });
 
   const handleSuccess = () => {
+    const nextPath = postAuthPath;
     setGuestMode(false);
-    if (postAuthPath) {
-      router.replace(postAuthPath as never);
+    setPostAuthPath(null);
+    if (nextPath) {
+      router.replace(nextPath as never);
     } else {
       router.replace('/(auth)/role');
     }
@@ -132,8 +135,10 @@ export default function AuthScreen() {
         variant="secondary"
         onPress={async () => {
           try {
-            await signInWithGoogle();
-            handleSuccess();
+            const completed = await signInWithGoogle();
+            if (completed) {
+              handleSuccess();
+            }
           } catch (error) {
             Alert.alert('Google sign-in failed', error instanceof Error ? error.message : 'Please try again.');
           }

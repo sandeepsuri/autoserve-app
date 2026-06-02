@@ -31,7 +31,7 @@ export function DiscoverScreen({ shopRoute = '/(public)/shop' }: Props) {
     Location.requestForegroundPermissionsAsync().catch(() => undefined);
   }, []);
 
-  const { data: vendors = [], isLoading } = useQuery({
+  const { data: vendors = [], error, isLoading } = useQuery({
     queryKey: ['vendors', query, mobileOnly, minimumRating],
     queryFn: () =>
       listVendors({
@@ -87,9 +87,14 @@ export function DiscoverScreen({ shopRoute = '/(public)/shop' }: Props) {
         </Pressable>
       ) : null}
 
-      <SectionHeader title="Available now" actionLabel={isLoading ? 'Loading...' : `${vendors.length} results`} />
+      <SectionHeader title="Available now" actionLabel={isLoading ? 'Loading...' : error ? 'Error' : `${vendors.length} results`} />
 
-      {vendors.length ? (
+      {error ? (
+        <EmptyState
+          title="Could not load shops"
+          body={error instanceof Error ? error.message : 'Supabase did not return vendor data for this build.'}
+        />
+      ) : vendors.length ? (
         vendors.map((vendor) => (
           <VendorCard
             key={vendor.id}

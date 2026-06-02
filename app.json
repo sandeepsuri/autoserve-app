@@ -17,7 +17,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.vibez.autoserve",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "AutoServe uses your location to show nearby automotive service providers and route mobile service bookings."
+        "NSLocationWhenInUseUsageDescription": "AutoServe uses your location to show nearby automotive service providers and route mobile service bookings.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -43,6 +44,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a0bb91f4-a7a8-47b6-8540-d07e96bf9a86"
+      }
     }
   }
 }

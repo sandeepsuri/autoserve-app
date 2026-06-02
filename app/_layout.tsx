@@ -58,6 +58,10 @@ function RouteGate() {
     return <Redirect href="/(auth)" />;
   }
 
+  if (inClient && session && profile?.role === 'vendor') {
+    return <Redirect href="/(vendor)" />;
+  }
+
   if (inClient && !session && !guestMode) {
     return <Redirect href="/(auth)" />;
   }

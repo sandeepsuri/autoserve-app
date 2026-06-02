@@ -1,7 +1,7 @@
-import { useDemoDataStore } from '@/store/useDemoDataStore';
+import { demoReviewsState, useDemoDataStore } from '@/store/useDemoDataStore';
 import { DiscoveryFilters, Review, Service, VendorSummary } from '@/types/domain';
 
-import { isSupabaseConfigured, supabase } from './supabase';
+import { isDemoDataEnabled, isSupabaseConfigured, supabase } from './supabase';
 
 const defaultFilters: DiscoveryFilters = {
   query: '',
@@ -79,20 +79,30 @@ function filterVendors(vendors: VendorSummary[], filters: DiscoveryFilters) {
 export async function listVendors(filters: Partial<DiscoveryFilters> = {}) {
   const merged = { ...defaultFilters, ...filters };
   if (!isSupabaseConfigured || !supabase) {
-    return filterVendors(useDemoDataStore.getState().vendors, merged);
+    return isDemoDataEnabled ? filterVendors(useDemoDataStore.getState().vendors, merged) : [];
   }
 
   const { data, error } = await supabase.from('vendors').select('*');
-  if (error || !data) {
-    return filterVendors(useDemoDataStore.getState().vendors, merged);
+  if (error) {
+    throw new Error(error.message ?? 'Failed to load vendors from Supabase.');
   }
 
-  return filterVendors(data.map(mapVendorRow), merged);
+  return filterVendors((data ?? []).map(mapVendorRow), merged);
 }
 
 export async function getVendorDetail(vendorId: string) {
   if (!isSupabaseConfigured || !supabase) {
-    return { vendor: null, services: [] as Service[], reviews: [] as Review[], businessHours: [] as { day: string; hours: string }[] };
+    if (!isDemoDataEnabled) {
+      return { vendor: null, services: [] as Service[], reviews: [] as Review[], businessHours: [] as { day: string; hours: string }[] };
+    }
+    const demo = useDemoDataStore.getState();
+    const vendor = demo.vendors.find((item) => item.id === vendorId) ?? null;
+    return {
+      vendor,
+      services: demo.services.filter((item) => item.vendorId === vendorId && item.active),
+      reviews: demoReviewsState.filter((item) => item.vendorId === vendorId),
+      businessHours: [] as { day: string; hours: string }[],
+    };
   }
 
   const [vendorResult, servicesResult, reviewsResult] = await Promise.all([
@@ -100,6 +110,18 @@ export async function getVendorDetail(vendorId: string) {
     supabase.from('services').select('*').eq('vendor_id', vendorId).eq('active', true),
     supabase.from('reviews').select('*').eq('vendor_id', vendorId).order('created_at', { ascending: false }),
   ]);
+
+  if (vendorResult.error) {
+    throw new Error(vendorResult.error.message ?? 'Failed to load vendor from Supabase.');
+  }
+
+  if (servicesResult.error) {
+    throw new Error(servicesResult.error.message ?? 'Failed to load services from Supabase.');
+  }
+
+  if (reviewsResult.error) {
+    throw new Error(reviewsResult.error.message ?? 'Failed to load reviews from Supabase.');
+  }
 
   if (!vendorResult.data) {
     return { vendor: null, services: [] as Service[], reviews: [] as Review[], businessHours: [] as { day: string; hours: string }[] };
