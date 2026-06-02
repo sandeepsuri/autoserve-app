@@ -26,6 +26,15 @@ function RouteGate() {
   const inVendor = rootSegment === '(vendor)';
   const inClient = rootSegment === '(client)';
   const inPublic = rootSegment === '(public)';
+  const routeName = segments[1];
+
+  if (inPublic && routeName === 'welcome' && session && profile?.role === 'client') {
+    return <Redirect href="/(client)" />;
+  }
+
+  if (inPublic && routeName === 'welcome' && session && profile?.role === 'vendor') {
+    return <Redirect href={profile.businessType ? '/(vendor)' : '/(auth)/vendor-onboarding'} />;
+  }
 
   if (inAuth && session && profile?.role === 'vendor') {
     const onboardingDone = Boolean(profile.businessType);

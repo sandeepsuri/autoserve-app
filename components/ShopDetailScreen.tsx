@@ -15,6 +15,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { ServiceCard } from '@/components/ServiceCard';
 import { colors, spacing, typography } from '@/constants/theme';
 import { getVendorDetail } from '@/lib/vendors';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useBookingDraftStore } from '@/store/useBookingDraftStore';
 
 interface Props {
@@ -25,6 +26,7 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { clearDraft, updateDraft } = useBookingDraftStore();
+  const { session, setGuestMode } = useAuthStore();
 
   const { data, isLoading } = useQuery({
     queryKey: ['vendor-detail', id],
@@ -121,6 +123,9 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
           label="Book Appointment"
           variant="accent"
           onPress={() => {
+            if (!session) {
+              setGuestMode(true);
+            }
             clearDraft();
             updateDraft({ vendorId: vendor.id });
             router.push('/(client)/booking/vehicle');

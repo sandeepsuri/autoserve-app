@@ -21,7 +21,7 @@ interface Props {
 
 export function DiscoverScreen({ shopRoute = '/(public)/shop' }: Props) {
   const router = useRouter();
-  const { session } = useAuthStore();
+  const { session, guestMode, setPostAuthPath } = useAuthStore();
   const [view, setView] = useState<'map' | 'list'>('map');
   const [query, setQuery] = useState('');
   const [mobileOnly, setMobileOnly] = useState(false);
@@ -56,6 +56,23 @@ export function DiscoverScreen({ shopRoute = '/(public)/shop' }: Props) {
           ) : null}
         </View>
         <Text style={styles.subtitle}>Search tires, oil changes, diagnostics, and mobile mechanics around you.</Text>
+        {guestMode && !session ? (
+          <View style={styles.guestTabs}>
+            <View style={[styles.guestTab, styles.guestTabActive]}>
+              <Text style={[styles.guestTabText, styles.guestTabTextActive]}>Guest</Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                setPostAuthPath('/(client)');
+                router.push('/(auth)');
+              }}
+              hitSlop={8}
+              style={styles.guestTab}
+            >
+              <Text style={styles.guestTabText}>Log In</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
 
       <TextInput
@@ -121,6 +138,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  guestTabs: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgElevated,
+    padding: 3,
+  },
+  guestTab: {
+    minHeight: 32,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  guestTabActive: {
+    backgroundColor: colors.bgStrong,
+  },
+  guestTabText: {
+    ...typography.labelMd,
+    color: colors.surfaceBrand,
+  },
+  guestTabTextActive: {
+    color: colors.textInverse,
   },
   subtitle: {
     ...typography.bodyMd,

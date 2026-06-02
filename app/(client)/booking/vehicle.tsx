@@ -17,10 +17,11 @@ import { Vehicle } from '@/types/domain';
 export default function BookingVehicleScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useBookingDraftStore();
-  const { session, guestMode } = useAuthStore();
+  const { session, guestMode, guestClientId } = useAuthStore();
+  const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
 
   const { data: vehicles = [], isLoading } = useQuery({
-    queryKey: ['client-vehicles'],
+    queryKey: ['client-vehicles', vehicleOwnerKey],
     queryFn: listVehicles,
   });
 
@@ -28,13 +29,13 @@ export default function BookingVehicleScreen() {
 
   useEffect(() => {
     if (isLoading) return;
-    if (draft.vehicleId) {
+    if (draft.vehicleId && vehicles.some((vehicle) => vehicle.id === draft.vehicleId)) {
       setSelectedId(draft.vehicleId);
     } else {
       const def = vehicles.find((v) => v.isDefault);
-      if (def) setSelectedId(def.id);
+      setSelectedId(def?.id ?? null);
     }
-  }, [isLoading]); // seed once after load
+  }, [draft.vehicleId, isLoading, vehicles, vehicleOwnerKey]);
 
   if (!session && !guestMode) {
     return (

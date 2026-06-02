@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
+import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { EmptyState } from '@/components/EmptyState';
 import { FilterChip } from '@/components/FilterChip';
@@ -10,6 +11,7 @@ import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
 import { STATUS_COLORS, STATUS_LABEL } from '@/lib/booking-status';
 import { listBookingsForCurrentUser } from '@/lib/bookings';
+import { useAuthStore } from '@/store/useAuthStore';
 import { BookingRecord } from '@/types/domain';
 
 type Tab = 'upcoming' | 'history';
@@ -20,16 +22,31 @@ function isUpcoming(status: BookingRecord['status']) {
 
 export default function ClientBookingsScreen() {
   const router = useRouter();
+  const session = useAuthStore((state) => state.session);
   const [tab, setTab] = useState<Tab>('upcoming');
 
   const { data: bookings = [], refetch, isRefetching } = useQuery({
     queryKey: ['client-bookings'],
     queryFn: listBookingsForCurrentUser,
+    enabled: Boolean(session),
   });
 
   const filtered = bookings.filter((b) =>
     tab === 'upcoming' ? isUpcoming(b.status) : !isUpcoming(b.status),
   );
+
+  if (!session) {
+    return (
+      <Screen>
+        <Text style={typography.titleLg}>Your bookings</Text>
+        <EmptyState
+          title="Sign in to view bookings"
+          body="Guests can browse and build a booking draft, but saved bookings are tied to a signed-in client account."
+        />
+        <AppButton label="Sign In" variant="primary" onPress={() => router.push('/(auth)')} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.surfaceAccent} />}>
