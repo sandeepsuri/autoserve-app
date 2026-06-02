@@ -7,7 +7,6 @@ import { AppCard } from '@/components/AppCard';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { colors, radius, spacing, typography } from '@/constants/theme';
-import { queryClient as sharedQueryClient } from '@/lib/query-client';
 import { listVehicles, removeVehicle, setDefaultVehicle } from '@/lib/vehicles';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Vehicle } from '@/types/domain';
@@ -15,7 +14,8 @@ import { Vehicle } from '@/types/domain';
 export default function ClientVehiclesScreen() {
   const router = useRouter();
   const qc = useQueryClient();
-  const { session, guestMode } = useAuthStore();
+  const { session, guestMode, guestClientId } = useAuthStore();
+  const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
 
   const {
     data: vehicles = [],
@@ -23,7 +23,7 @@ export default function ClientVehiclesScreen() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ['client-vehicles'],
+    queryKey: ['client-vehicles', vehicleOwnerKey],
     queryFn: listVehicles,
   });
 

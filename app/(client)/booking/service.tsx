@@ -14,6 +14,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import { listVehicles } from '@/lib/vehicles';
 import { getVendorDetail } from '@/lib/vendors';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useBookingDraftStore } from '@/store/useBookingDraftStore';
 import { BookingMode } from '@/types/domain';
 
@@ -33,6 +34,8 @@ const MODE_OPTIONS: { value: BookingMode; label: string; helper: string }[] = [
 export default function BookingDetailsScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useBookingDraftStore();
+  const { session, guestClientId } = useAuthStore();
+  const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
 
   const seeded = useRef(false);
   useEffect(() => {
@@ -48,7 +51,7 @@ export default function BookingDetailsScreen() {
   });
 
   const { data: vehicles = [] } = useQuery({
-    queryKey: ['client-vehicles'],
+    queryKey: ['client-vehicles', vehicleOwnerKey],
     queryFn: listVehicles,
     enabled: Boolean(draft.vehicleId),
   });
@@ -59,13 +62,14 @@ export default function BookingDetailsScreen() {
   const selectedModeMeta = MODE_OPTIONS.find((option) => option.value === selectedMode);
 
   const savedVehicle = vehicles.find((v) => v.id === draft.vehicleId);
+  const hasCurrentOwnerVehicle = Boolean(savedVehicle);
   const vehicleLabel = savedVehicle
     ? savedVehicle.nickname
       ? `${savedVehicle.nickname} (${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model})`
       : `${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model}`
     : null;
 
-  const canContinue = Boolean(vendor && draft.vehicleId && selectedMode);
+  const canContinue = Boolean(vendor && hasCurrentOwnerVehicle && selectedMode);
 
   if (!draft.vendorId) {
     return (
@@ -145,6 +149,10 @@ export default function BookingDetailsScreen() {
 
       {!vendor?.mobileServiceEnabled ? (
         <Text style={styles.infoText}>This vendor is currently accepting shop visits only.</Text>
+      ) : null}
+
+      {draft.vehicleId && !hasCurrentOwnerVehicle ? (
+        <Text style={styles.infoText}>Choose a vehicle saved to the current account before continuing.</Text>
       ) : null}
 
       <AppButton

@@ -22,7 +22,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       session: null,
       profile: null,
       loading: true,
@@ -32,6 +32,9 @@ export const useAuthStore = create<AuthState>()(
       setGuestMode: (enabled) =>
         set((state) => ({
           guestMode: enabled,
+          // Guest ids are persisted only to keep demo-store vehicles/drafts
+          // reachable while browsing before auth. setSessionData clears them
+          // once a real user session exists.
           guestClientId: enabled
             ? (state.guestClientId ?? `guest-${Date.now().toString(36)}`)
             : null,

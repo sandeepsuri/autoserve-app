@@ -40,6 +40,7 @@ export default function BookingScheduleScreen() {
   const router = useRouter();
   const { draft, clearDraft, updateDraft } = useBookingDraftStore();
   const { session, profile, guestMode, guestClientId, setPostAuthPath } = useAuthStore();
+  const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
   const { data, isLoading } = useQuery({
     queryKey: ['booking-vendor-services', draft.vendorId],
     queryFn: () => getVendorDetail(draft.vendorId!),
@@ -47,7 +48,7 @@ export default function BookingScheduleScreen() {
   });
 
   const { data: vehicles = [] } = useQuery({
-    queryKey: ['client-vehicles'],
+    queryKey: ['client-vehicles', vehicleOwnerKey],
     queryFn: listVehicles,
     enabled: Boolean(draft.vehicleId),
   });
@@ -70,8 +71,8 @@ export default function BookingScheduleScreen() {
   const dateOptions = getUpcomingDateOptions();
   const selectedDateLabel = dateOptions.find((option) => option.value === draft.scheduledDate)?.label ?? draft.scheduledDate ?? 'Choose a date';
   const canConfirm = Boolean(
-    draft.vendorId &&
-      draft.vehicleId &&
+      draft.vendorId &&
+      savedVehicle &&
       draft.bookingMode &&
       selectedServiceIds.length &&
       draft.scheduledDate &&
@@ -94,10 +95,10 @@ export default function BookingScheduleScreen() {
       return;
     }
 
-    const clientId = session?.userId ?? guestClientId ?? null;
-
-    if (!clientId) {
-      setPostAuthPath('/(client)/booking/schedule');
+    if (!session) {
+      // Guest vehicle ids live under a temporary demo-store owner. Return to
+      // vehicle selection after auth so the booking uses an account-owned car.
+      setPostAuthPath('/(client)/booking/vehicle');
       router.push('/(auth)');
       return;
     }
@@ -127,7 +128,7 @@ export default function BookingScheduleScreen() {
         mobileAddress: draft.bookingMode === 'mobile' ? draft.mobileAddress : undefined,
         notes: draft.notes,
         photos: draft.photos,
-        clientId,
+        clientId: session.userId,
         clientName: profile?.fullName,
       });
 
@@ -244,8 +245,16 @@ export default function BookingScheduleScreen() {
         <Text style={styles.validationText}>Select at least one service, a date, and a time slot before confirming.</Text>
       ) : null}
 
+      {draft.vehicleId && !savedVehicle ? (
+        <Text style={styles.validationText}>Choose a vehicle saved to the current account before confirming.</Text>
+      ) : null}
+
+      {!session && guestMode ? (
+        <Text style={styles.validationText}>Sign in before confirming so the booking is saved to your account.</Text>
+      ) : null}
+
       <AppButton
-        label={session || guestMode ? 'Confirm Booking' : 'Sign In to Confirm'}
+        label={session ? 'Confirm Booking' : 'Sign In to Confirm'}
         variant="accent"
         disabled={!canConfirm}
         onPress={confirmBooking}

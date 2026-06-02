@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TextInput, View } from 'react-native';
 import { z } from 'zod';
 
 import { AppHeader } from '@/components/AppHeader';
@@ -24,6 +24,7 @@ export default function AuthScreen() {
   const router = useRouter();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [confirmationPending, setConfirmationPending] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const postAuthPath = useAuthStore((state) => state.postAuthPath);
   const setGuestMode = useAuthStore((state) => state.setGuestMode);
   const setPostAuthPath = useAuthStore((state) => state.setPostAuthPath);
@@ -39,11 +40,19 @@ export default function AuthScreen() {
 
   const handleSuccess = () => {
     const nextPath = postAuthPath;
+    const profile = useAuthStore.getState().profile;
+
     setGuestMode(false);
-    setPostAuthPath(null);
-    if (nextPath) {
-      router.replace(nextPath as never);
+
+    if (profile?.role === 'client') {
+      setPostAuthPath(null);
+      router.replace((nextPath as never) || '/(client)');
+    } else if (profile?.role === 'vendor') {
+      setPostAuthPath(null);
+      router.replace('/(vendor)');
     } else {
+      // Keep postAuthPath until role selection consumes it. Guest booking
+      // flows sign in here, then role selection returns clients to the draft.
       router.replace('/(auth)/role');
     }
   };
@@ -67,6 +76,7 @@ export default function AuthScreen() {
   });
 
   return (
+    <>
     <Screen contentStyle={styles.container}>
       <AppHeader
         title={mode === 'login' ? 'Welcome back' : 'Create your AutoServe account'}
@@ -135,16 +145,26 @@ export default function AuthScreen() {
         variant="secondary"
         onPress={async () => {
           try {
+            setGoogleLoading(true);
             const completed = await signInWithGoogle();
+            setGoogleLoading(false);
             if (completed) {
               handleSuccess();
             }
           } catch (error) {
+            setGoogleLoading(false);
             Alert.alert('Google sign-in failed', error instanceof Error ? error.message : 'Please try again.');
           }
         }}
       />
     </Screen>
+      <Modal visible={googleLoading} transparent animationType="fade">
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.textPrimary} />
+          <Text style={styles.loadingText}>Signing in...</Text>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -177,5 +197,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     color: colors.textPrimary,
     fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(11, 18, 32, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  loadingText: {
+    ...typography.bodyMd,
+    color: colors.textPrimary,
   },
 });

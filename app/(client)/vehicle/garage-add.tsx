@@ -44,6 +44,7 @@ export default function GarageAddScreen() {
   const { session, guestClientId } = useAuthStore();
   const { updateDraft } = useBookingDraftStore();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
 
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
@@ -76,7 +77,7 @@ export default function GarageAddScreen() {
   // ─── Determine if first vehicle (auto-default) ──────────────────────────────
 
   const { data: existingVehicles = [] } = useQuery({
-    queryKey: ['client-vehicles'],
+    queryKey: ['client-vehicles', vehicleOwnerKey],
     queryFn: listVehicles,
   });
 
