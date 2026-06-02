@@ -36,7 +36,10 @@ export const useAuthStore = create<AuthState>()(
             ? (state.guestClientId ?? `guest-${Date.now().toString(36)}`)
             : null,
         })),
-      setSessionData: (session, profile) => set({ session, profile, loading: false }),
+      setSessionData: (session, profile) =>
+        set(session
+          ? { session, profile, loading: false, guestMode: false, guestClientId: null }
+          : { session: null, profile: null, loading: false }),
       setLoading: (loading) => set({ loading }),
       setPostAuthPath: (path) => set({ postAuthPath: path }),
       clearAuth: () => set({ session: null, profile: null, guestMode: false, postAuthPath: null, loading: false }),
@@ -58,6 +61,11 @@ export const useAuthStore = create<AuthState>()(
 );
 
 let initialized = false;
+
+// Set to true while signIn/signInWithGoogle is actively running so the
+// onAuthStateChange listener doesn't race with a duplicate profile load.
+export let signingIn = false;
+export function setSigningIn(value: boolean) { signingIn = value; }
 
 export async function initAuthListener() {
   if (initialized) return;
@@ -86,7 +94,9 @@ export async function initAuthListener() {
           email: supabaseSession.user.email ?? 'unknown@autoserve.app',
         };
         const existing = useAuthStore.getState().session;
-        if (existing?.userId !== nextSession.userId) {
+        // Skip profile load if a sign-in function is already handling it to
+        // avoid concurrent Supabase queries that can deadlock or hang.
+        if (!signingIn && existing?.userId !== nextSession.userId) {
           const profile = await loadProfileForUser(nextSession.userId, nextSession.email);
           useAuthStore.getState().setSessionData(nextSession, profile);
         } else {

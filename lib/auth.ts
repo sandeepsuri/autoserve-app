@@ -1,10 +1,11 @@
-import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 import { AppSession, BusinessType, UserProfile, UserRole } from '@/types/domain';
+
+import { setSigningIn } from '@/store/useAuthStore';
 
 import { isSupabaseConfigured, supabase } from './supabase';
 
@@ -125,8 +126,9 @@ export async function signInWithGoogle() {
     return true;
   }
 
-  // TODO: Blocked by Expo Go limitation — verify after switching to a dev build.
-  const redirectTo = AuthSession.makeRedirectUri({ scheme: 'autoserve' });
+  const redirectTo = 'autoserve://auth/callback';
+  console.log('[Google] Starting OAuth, redirectTo:', redirectTo);
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -136,20 +138,45 @@ export async function signInWithGoogle() {
   });
 
   if (error) throw error;
+  console.log('[Google] OAuth URL obtained, opening browser');
+
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  if (result.type !== 'success') return false;
+  console.log('[Google] Browser result type:', result.type, 'url:', result.type === 'success' ? result.url : 'n/a');
 
-  const url = result.url;
-  const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(url);
-  if (exchangeError) throw exchangeError;
+  if (result.type !== 'success') {
+    console.log('[Google] Browser did not return success, returning false');
+    return false;
+  }
 
-  const session = {
-    userId: sessionData.user.id,
-    email: sessionData.user.email ?? 'google@autoserve.app',
-  };
-  const profile = await loadProfileForUser(session.userId, session.email);
-  useAuthStore.getState().setSessionData(session, profile);
-  return true;
+  const parsedUrl = new URL(result.url);
+  const errorParam = parsedUrl.searchParams.get('error') ?? parsedUrl.searchParams.get('error_description');
+  if (errorParam) throw new Error(errorParam);
+
+  const code = parsedUrl.searchParams.get('code');
+  console.log('[Google] Extracted code:', code ? `${code.slice(0, 8)}...` : 'NULL');
+  if (!code) throw new Error('No auth code in callback URL.');
+
+  setSigningIn(true);
+  try {
+    const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    console.log('[Google] exchangeCodeForSession error:', exchangeError?.message ?? 'none');
+    if (exchangeError) throw exchangeError;
+
+    const session = {
+      userId: sessionData.user.id,
+      email: sessionData.user.email ?? 'google@autoserve.app',
+    };
+    console.log('[Google] Session established for userId:', session.userId);
+
+    const profile = await loadProfileForUser(session.userId, session.email).catch(() => null);
+    console.log('[Google] Profile loaded, role:', profile?.role ?? 'none');
+
+    useAuthStore.getState().setSessionData(session, profile);
+    console.log('[Google] Auth store updated, returning true');
+    return true;
+  } finally {
+    setSigningIn(false);
+  }
 }
 
 export async function ensureProfileRow(): Promise<void> {
