@@ -168,31 +168,20 @@ export async function createBooking(input: Omit<BookingRecord, 'id' | 'createdAt
     return booking;
   }
 
-  const { data, error } = await supabase
-    .from('bookings')
-    .insert({
-      client_id: booking.clientId,
-      client_name: booking.clientName ?? null,
-      vendor_id: booking.vendorId,
-      vendor_name: booking.vendorName ?? null,
-      service_id: booking.serviceIds[0] ?? null,
-      service_ids: booking.serviceIds,
-      services_snapshot: booking.services,
-      vehicle_id: booking.vehicleId,
-      vehicle_label: booking.vehicleLabel ?? null,
-      booking_mode: booking.bookingMode,
-      mobile_address: booking.mobileAddress ?? null,
-      scheduled_at: booking.scheduledAt,
-      status: booking.status,
-      notes: booking.notes ?? null,
-      photos: booking.photos ?? [],
-      subtotal: booking.subtotal,
-      service_fee: booking.serviceFee,
-      total: booking.total,
-      updated_at: booking.updatedAt,
-    })
-    .select('*')
-    .single();
+  // Server computes prices, snapshot, and denormalized labels; direct inserts
+  // on bookings are blocked by RLS so totals can't be forged client-side.
+  const { data, error } = await supabase.rpc('create_booking', {
+    p_vendor_id: booking.vendorId,
+    p_service_ids: booking.serviceIds,
+    p_vehicle_id: booking.vehicleId,
+    p_booking_mode: booking.bookingMode,
+    p_scheduled_at: booking.scheduledAt,
+    p_appointment_date: booking.appointmentDate ?? null,
+    p_appointment_time: booking.appointmentTime ?? null,
+    p_mobile_address: booking.mobileAddress ?? null,
+    p_notes: booking.notes ?? null,
+    p_photos: booking.photos ?? [],
+  });
 
   if (error || !data) {
     const isAuthenticated = Boolean(useAuthStore.getState().session);
@@ -203,7 +192,7 @@ export async function createBooking(input: Omit<BookingRecord, 'id' | 'createdAt
     return booking;
   }
 
-  return rowToRecord(data);
+  return rowToRecord(data as Record<string, unknown>);
 }
 
 // ─── Create (high-level flow) ─────────────────────────────────────────────────

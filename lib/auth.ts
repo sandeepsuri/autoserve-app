@@ -127,24 +127,23 @@ export async function signInWithGoogle() {
   }
 
   const redirectTo = 'autoserve://auth/callback';
-  console.log('[Google] Starting OAuth, redirectTo:', redirectTo);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo,
       skipBrowserRedirect: true,
+      // Always show Google's account chooser instead of silently reusing the
+      // browser's cached Google session.
+      queryParams: { prompt: 'select_account' },
     },
   });
 
   if (error) throw error;
-  console.log('[Google] OAuth URL obtained, opening browser');
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  console.log('[Google] Browser result type:', result.type, 'url:', result.type === 'success' ? result.url : 'n/a');
 
   if (result.type !== 'success') {
-    console.log('[Google] Browser did not return success, returning false');
     return false;
   }
 
@@ -153,26 +152,21 @@ export async function signInWithGoogle() {
   if (errorParam) throw new Error(errorParam);
 
   const code = parsedUrl.searchParams.get('code');
-  console.log('[Google] Extracted code:', code ? `${code.slice(0, 8)}...` : 'NULL');
   if (!code) throw new Error('No auth code in callback URL.');
 
   setSigningIn(true);
   try {
     const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-    console.log('[Google] exchangeCodeForSession error:', exchangeError?.message ?? 'none');
     if (exchangeError) throw exchangeError;
 
     const session = {
       userId: sessionData.user.id,
       email: sessionData.user.email ?? 'google@autoserve.app',
     };
-    console.log('[Google] Session established for userId:', session.userId);
 
     const profile = await loadProfileForUser(session.userId, session.email).catch(() => null);
-    console.log('[Google] Profile loaded, role:', profile?.role ?? 'none');
 
     useAuthStore.getState().setSessionData(session, profile);
-    console.log('[Google] Auth store updated, returning true');
     return true;
   } finally {
     setSigningIn(false);

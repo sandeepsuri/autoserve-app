@@ -10,10 +10,6 @@ jest.mock('expo-web-browser', () => ({
   openAuthSessionAsync: jest.fn(),
 }));
 
-jest.mock('expo-auth-session', () => ({
-  makeRedirectUri: jest.fn(() => 'autoserve://'),
-}));
-
 if (!global.WebSocket) {
   global.WebSocket = class MockWebSocket {} as unknown as typeof WebSocket;
 }
