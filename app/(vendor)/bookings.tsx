@@ -114,7 +114,14 @@ export default function VendorBookingsScreen() {
                   <Text style={styles.meta}>{`$${booking.total.toFixed(2)}`}</Text>
                 </View>
 
-                <Text style={styles.location}>{location}</Text>
+                <View style={styles.metaRow}>
+                  <Text style={styles.meta}>User Notes:</Text>
+                  <Text style={styles.meta}>{`${booking.notes}`}</Text>
+                </View>
+                
+                <View style={styles.metaRow}>
+                  <Text style={styles.location}>{location}</Text>
+                </View>
 
                 {booking.status === 'pending' ? (
                   <View style={styles.actions}>

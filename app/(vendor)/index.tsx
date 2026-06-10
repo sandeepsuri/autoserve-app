@@ -46,7 +46,9 @@ export default function VendorDashboardScreen() {
         bookings.slice(0, 3).map((booking) => (
           <AppCard key={booking.id}>
             <Text style={typography.titleSm}>{booking.clientName || 'Client'}</Text>
+            <Text style={styles.subtitle}>{`${booking.vehicleLabel} - ${booking.services.map((s) => s.title).join(' · ')}`}</Text>
             <Text style={styles.subtitle}>{formatScheduledEST(booking.scheduledAt)}</Text>
+            <Text style={styles.notes}>{booking.notes}</Text>
             <Text style={styles.status}>{booking.status.toUpperCase()}</Text>
           </AppCard>
         ))
@@ -61,6 +63,10 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.bodyMd,
     color: colors.textSecondary,
+  },
+  notes: {
+    ...typography.bodyMd,
+    color: colors.info,
   },
   row: {
     flexDirection: 'row',
