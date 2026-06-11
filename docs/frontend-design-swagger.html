@@ -1,0 +1,2528 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AutoServe Frontend Design Swagger</title>
+  <style>
+    :root {
+      --bg-base: #f8fafc;
+      --bg-elevated: #ffffff;
+      --bg-strong: #0b1220;
+      --brand: #0f4c81;
+      --success: #10b981;
+      --accent: #ff7a1a;
+      --subtle-green: #ecfdf5;
+      --subtle-orange: #fff7ed;
+      --text: #0f172a;
+      --muted: #475569;
+      --faint: #94a3b8;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --danger: #b91c1c;
+      --pending: #c2410c;
+      --info: #1d4ed8;
+      --shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
+      --radius-card: 18px;
+      --radius-button: 999px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg-base);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(15, 76, 129, 0.08), transparent 430px),
+        var(--bg-base);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .page-shell {
+      display: grid;
+      grid-template-columns: 292px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      border-right: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(18px);
+      padding: 24px 18px;
+    }
+
+    .sidebar h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .sidebar p {
+      margin: 10px 0 18px;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 13px;
+    }
+
+    .nav-label {
+      margin: 24px 0 8px;
+      color: var(--faint);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .nav {
+      display: grid;
+      gap: 5px;
+    }
+
+    .nav a {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-radius: 10px;
+      padding: 9px 10px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .nav a:hover {
+      color: var(--text);
+      background: var(--bg-base);
+    }
+
+    .nav small {
+      color: var(--faint);
+      font-weight: 800;
+    }
+
+    main {
+      min-width: 0;
+      padding: 34px clamp(20px, 5vw, 64px) 72px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+      gap: 28px;
+      align-items: stretch;
+      margin-bottom: 30px;
+    }
+
+    .hero-panel {
+      background: var(--bg-strong);
+      color: #fff;
+      border-radius: 28px;
+      padding: clamp(26px, 4vw, 44px);
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      border-radius: var(--radius-button);
+      padding: 0 12px;
+      background: rgba(255, 255, 255, 0.11);
+      color: #dbeafe;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .hero h2 {
+      margin: 20px 0 12px;
+      font-size: clamp(36px, 5vw, 62px);
+      line-height: 0.98;
+      letter-spacing: 0;
+      max-width: 860px;
+    }
+
+    .hero p {
+      color: #cbd5e1;
+      line-height: 1.65;
+      font-size: 16px;
+      max-width: 780px;
+    }
+
+    .summary-panel {
+      display: grid;
+      gap: 14px;
+    }
+
+    .metric {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      background: var(--bg-elevated);
+      padding: 18px;
+      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 28px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .section {
+      margin-top: 36px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 18px;
+      margin-bottom: 16px;
+    }
+
+    .section-header h2 {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .section-header p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      max-width: 780px;
+      line-height: 1.55;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: var(--radius-button);
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      min-height: 30px;
+      padding: 0 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .flow-map {
+      display: grid;
+      gap: 12px;
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: 142px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .flow-title {
+      padding: 12px 0;
+      color: var(--brand);
+      font-weight: 900;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .flow-steps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .flow-step {
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      border-radius: 14px;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .figma-board {
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      background:
+        radial-gradient(circle, rgba(148, 163, 184, 0.42) 1px, transparent 1px),
+        #f3f7fb;
+      background-size: 22px 22px;
+      box-shadow: var(--shadow);
+      overflow: auto;
+      padding: 28px;
+    }
+
+    .board-canvas {
+      min-width: 1500px;
+      display: grid;
+      gap: 28px;
+    }
+
+    .board-lane {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(203, 213, 225, 0.72);
+    }
+
+    .lane-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .lane-header h3 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.15;
+    }
+
+    .lane-header p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .board-row {
+      display: flex;
+      gap: 28px;
+      align-items: flex-start;
+    }
+
+    .flow-node {
+      position: relative;
+      width: 142px;
+      flex: 0 0 142px;
+    }
+
+    .flow-node:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 104px;
+      left: calc(100% + 7px);
+      width: 14px;
+      height: 2px;
+      background: var(--border-strong);
+    }
+
+    .flow-node:not(:last-child)::before {
+      content: "";
+      position: absolute;
+      top: 99px;
+      left: calc(100% + 19px);
+      width: 0;
+      height: 0;
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+      border-left: 8px solid var(--border-strong);
+    }
+
+    .mini-phone {
+      height: 254px;
+      border: 6px solid var(--bg-strong);
+      border-radius: 22px;
+      background: var(--bg-base);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding: 9px;
+    }
+
+    .mini-status {
+      display: flex;
+      justify-content: space-between;
+      font-size: 8px;
+      line-height: 1;
+      font-weight: 900;
+      color: var(--text);
+    }
+
+    .mini-title {
+      font-size: 14px;
+      line-height: 1.05;
+      font-weight: 900;
+      color: var(--text);
+    }
+
+    .mini-copy {
+      height: 6px;
+      border-radius: 99px;
+      background: var(--border-strong);
+      opacity: 0.8;
+    }
+
+    .mini-copy.short {
+      width: 58%;
+    }
+
+    .mini-copy.medium {
+      width: 76%;
+    }
+
+    .mini-hero {
+      height: 62px;
+      border-radius: 14px;
+      background:
+        linear-gradient(140deg, rgba(11, 18, 32, 0.12), rgba(15, 76, 129, 0.16)),
+        url("https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=360&q=70") center/cover;
+    }
+
+    .mini-map {
+      height: 58px;
+      border-radius: 13px;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(90deg, rgba(226, 232, 240, 0.9) 1px, transparent 1px),
+        linear-gradient(rgba(226, 232, 240, 0.9) 1px, transparent 1px),
+        #eef6f8;
+      background-size: 16px 16px;
+      position: relative;
+    }
+
+    .mini-map::after {
+      content: "";
+      position: absolute;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 3px solid #fff;
+      right: 24px;
+      top: 18px;
+    }
+
+    .mini-card {
+      min-height: 28px;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      padding: 7px;
+      display: grid;
+      gap: 5px;
+    }
+
+    .mini-card.dark {
+      background: var(--bg-strong);
+      border-color: var(--bg-strong);
+    }
+
+    .mini-card.green {
+      background: var(--subtle-green);
+      border-color: #bbf7d0;
+    }
+
+    .mini-line {
+      height: 5px;
+      border-radius: 99px;
+      background: var(--border-strong);
+    }
+
+    .mini-line.brand {
+      background: var(--brand);
+    }
+
+    .mini-line.accent {
+      background: var(--accent);
+    }
+
+    .mini-line.white {
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .mini-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .mini-chip {
+      width: 38px;
+      height: 14px;
+      border-radius: 99px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+    }
+
+    .mini-chip.active {
+      background: var(--bg-strong);
+      border-color: var(--bg-strong);
+    }
+
+    .mini-cta {
+      margin-top: auto;
+      height: 22px;
+      border-radius: 99px;
+      background: var(--brand);
+    }
+
+    .mini-cta.accent {
+      background: var(--accent);
+    }
+
+    .mini-cta.secondary {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+    }
+
+    .node-label {
+      margin-top: 9px;
+      font-size: 12px;
+      line-height: 1.25;
+      font-weight: 900;
+      color: var(--text);
+    }
+
+    .node-route {
+      margin-top: 3px;
+      font-size: 9px;
+      line-height: 1.25;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .legend-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .theme-card {
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: var(--bg-elevated);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .theme-card h3 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.15;
+    }
+
+    .theme-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .swatch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+    }
+
+    .swatch {
+      min-height: 108px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      overflow: hidden;
+    }
+
+    .swatch-color {
+      height: 54px;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .swatch-meta {
+      padding: 10px 12px;
+      display: grid;
+      gap: 3px;
+    }
+
+    .swatch-name {
+      font-weight: 900;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .swatch-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .style-token-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
+    }
+
+    .style-token {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--bg-elevated);
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .style-token strong {
+      font-size: 14px;
+    }
+
+    .style-token span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .component-samples {
+      display: grid;
+      gap: 12px;
+    }
+
+    .type-sample {
+      border-left: 4px solid var(--brand);
+      padding-left: 14px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .type-display {
+      font-size: 44px;
+      line-height: 0.98;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .type-title {
+      font-size: 28px;
+      line-height: 1.1;
+      font-weight: 800;
+    }
+
+    .type-body {
+      color: var(--muted);
+      line-height: 1.55;
+      font-weight: 600;
+    }
+
+    .sample-panel {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--bg-base);
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .page-card {
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      margin: 22px 0;
+      overflow: hidden;
+    }
+
+    .page-card-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: start;
+      border-bottom: 1px solid var(--border);
+      padding: 22px;
+    }
+
+    .page-card-header h3 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .route {
+      display: inline-flex;
+      margin-top: 8px;
+      border-radius: 8px;
+      background: var(--bg-base);
+      border: 1px solid var(--border);
+      color: var(--brand);
+      padding: 7px 9px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .page-body {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(300px, 390px);
+      gap: 22px;
+      padding: 22px;
+      align-items: start;
+    }
+
+    .spec-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .spec-block {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      background: var(--bg-elevated);
+      padding: 16px;
+    }
+
+    .spec-block h4 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: var(--faint);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .spec-block p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .spec-block ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.58;
+      font-size: 14px;
+    }
+
+    .screen {
+      width: min(100%, 390px);
+      min-height: 760px;
+      margin-left: auto;
+      border-radius: 32px;
+      border: 10px solid var(--bg-strong);
+      background: var(--bg-base);
+      box-shadow: 0 28px 70px rgba(15, 23, 42, 0.22);
+      overflow: hidden;
+      position: sticky;
+      top: 20px;
+    }
+
+    .screen-scroll {
+      min-height: 740px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .phone-status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 900;
+      margin-bottom: 2px;
+    }
+
+    .phone-home {
+      width: 116px;
+      height: 4px;
+      border-radius: 999px;
+      background: #111827;
+      opacity: 0.18;
+      margin: 8px auto 0;
+    }
+
+    .screen h4 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .screen h5 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.18;
+    }
+
+    .screen p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .screen .caption {
+      color: var(--faint);
+      font-size: 12px;
+    }
+
+    .mock-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .back {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      color: var(--brand);
+    }
+
+    .button {
+      min-height: 46px;
+      border-radius: var(--radius-button);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 18px;
+      font-weight: 900;
+      font-size: 14px;
+      border: 1px solid transparent;
+      background: var(--brand);
+      color: #fff;
+      text-align: center;
+    }
+
+    .button.accent {
+      background: var(--accent);
+    }
+
+    .button.secondary {
+      background: var(--bg-elevated);
+      border-color: var(--border);
+      color: var(--brand);
+    }
+
+    .button.ghost {
+      background: transparent;
+      color: var(--brand);
+    }
+
+    .button.danger {
+      background: #fef2f2;
+      color: var(--danger);
+      border-color: #fecaca;
+    }
+
+    .button.disabled {
+      opacity: 0.48;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .mock-card {
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      border-radius: var(--radius-card);
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+    }
+
+    .mock-card.dark {
+      background: var(--bg-strong);
+      color: #fff;
+      border-color: var(--bg-strong);
+    }
+
+    .mock-card.green {
+      background: var(--subtle-green);
+      border-color: #bbf7d0;
+    }
+
+    .mock-card.orange {
+      background: var(--subtle-orange);
+      border-color: #fed7aa;
+    }
+
+    .mock-card h5,
+    .mock-card strong {
+      margin: 0;
+    }
+
+    .hero-image {
+      min-height: 210px;
+      border-radius: 24px;
+      background:
+        linear-gradient(140deg, rgba(11, 18, 32, 0.18), rgba(15, 76, 129, 0.12)),
+        url("https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=900&q=80") center/cover;
+    }
+
+    .shop-image {
+      min-height: 180px;
+      border-radius: 24px;
+      background:
+        linear-gradient(140deg, rgba(11, 18, 32, 0.2), rgba(15, 76, 129, 0.08)),
+        url("https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=900&q=80") center/cover;
+    }
+
+    .input {
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      border-radius: 16px;
+      min-height: 50px;
+      padding: 14px 15px;
+      color: var(--faint);
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--text);
+      margin-bottom: -4px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      display: inline-flex;
+      min-height: 34px;
+      align-items: center;
+      border-radius: var(--radius-button);
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      padding: 0 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .chip.active {
+      background: var(--bg-strong);
+      color: #fff;
+      border-color: var(--bg-strong);
+    }
+
+    .map {
+      min-height: 150px;
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(90deg, rgba(226, 232, 240, 0.7) 1px, transparent 1px),
+        linear-gradient(rgba(226, 232, 240, 0.7) 1px, transparent 1px),
+        #eef6f8;
+      background-size: 34px 34px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .map::before {
+      content: "";
+      position: absolute;
+      width: 190px;
+      height: 44px;
+      border-radius: 22px;
+      background: rgba(16, 185, 129, 0.18);
+      transform: rotate(-18deg);
+      left: -36px;
+      top: 54px;
+    }
+
+    .pin {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 4px solid #fff;
+      box-shadow: 0 8px 20px rgba(255, 122, 26, 0.35);
+    }
+
+    .pin.one {
+      left: 70%;
+      top: 34%;
+    }
+
+    .pin.two {
+      left: 38%;
+      top: 58%;
+      background: var(--brand);
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      font-weight: 900;
+    }
+
+    .section-title span {
+      color: var(--faint);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .vendor-card,
+    .service-card,
+    .booking-card {
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      border-radius: var(--radius-card);
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .vendor-top,
+    .row-between {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 10px;
+    }
+
+    .avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: var(--brand);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      align-self: start;
+      min-height: 26px;
+      border-radius: var(--radius-button);
+      padding: 0 10px;
+      font-size: 11px;
+      font-weight: 900;
+      background: var(--subtle-orange);
+      color: var(--pending);
+    }
+
+    .status.good {
+      background: var(--subtle-green);
+      color: #047857;
+    }
+
+    .status.info {
+      background: #eff6ff;
+      color: var(--info);
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .summary-table {
+      display: grid;
+      gap: 8px;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .summary-row strong {
+      color: var(--text);
+      text-align: right;
+    }
+
+    .step-progress {
+      display: flex;
+      gap: 6px;
+    }
+
+    .step-progress span {
+      height: 6px;
+      flex: 1;
+      border-radius: 999px;
+      background: var(--border);
+    }
+
+    .step-progress span.done {
+      background: var(--brand);
+    }
+
+    .phone-footer {
+      margin-top: auto;
+      display: grid;
+      gap: 9px;
+      padding-top: 4px;
+    }
+
+    .doc-note {
+      border-left: 4px solid var(--brand);
+      background: #f6fbff;
+      padding: 14px 16px;
+      color: var(--muted);
+      border-radius: 10px;
+      line-height: 1.55;
+      margin: 18px 0;
+    }
+
+    .print-hint {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      border-radius: 18px;
+      padding: 16px;
+      color: var(--muted);
+      margin: 24px 0;
+    }
+
+    @media (max-width: 1100px) {
+      .page-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: relative;
+        height: auto;
+      }
+
+      .hero,
+      .page-body {
+        grid-template-columns: 1fr;
+      }
+
+      .screen {
+        position: relative;
+        top: auto;
+        margin: 0 auto;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .page-shell {
+        display: block;
+      }
+
+      .sidebar,
+      .print-hint {
+        display: none;
+      }
+
+      main {
+        padding: 0;
+      }
+
+      .hero {
+        display: block;
+      }
+
+      .summary-panel,
+      .flow-map {
+        break-inside: avoid;
+      }
+
+      .page-card {
+        break-inside: avoid;
+        box-shadow: none;
+      }
+
+      .screen {
+        position: static;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <aside class="sidebar">
+      <h1>AutoServe Design Swagger</h1>
+      <p>Static internal documentation for showing, scanning, and screenshotting the app's current frontend flow.</p>
+      <div class="nav-label">Overview</div>
+      <nav class="nav">
+        <a href="#overview">Product map <small>00</small></a>
+        <a href="#all-screens">All screens <small>board</small></a>
+        <a href="#theme-legend">Theme legend <small>style</small></a>
+        <a href="#public">Public pages <small>04</small></a>
+        <a href="#auth">Auth and setup <small>09</small></a>
+        <a href="#client">Client pages <small>13</small></a>
+        <a href="#vendor">Vendor pages <small>06</small></a>
+      </nav>
+      <div class="nav-label">Screenshot Groups</div>
+      <nav class="nav">
+        <a href="#welcome">Welcome <small>public</small></a>
+        <a href="#discover">Discover <small>shared</small></a>
+        <a href="#shop-detail">Shop detail <small>shared</small></a>
+        <a href="#booking-schedule">Booking checkout <small>client</small></a>
+        <a href="#vendor-dashboard">Vendor dashboard <small>vendor</small></a>
+      </nav>
+    </aside>
+
+    <main>
+      <section id="overview" class="hero">
+        <div class="hero-panel">
+          <span class="eyebrow">Internal frontend reference</span>
+          <h2>Every route, key state, and screenshot-ready page surface in one web document.</h2>
+          <p>
+            Built from the Expo Router structure and the `.claude` handoff docs. This is not API Swagger.
+            It is a design and product-flow specification for project owner reviews, stakeholder walkthroughs,
+            and fast visual capture before design changes.
+          </p>
+        </div>
+        <div class="summary-panel">
+          <div class="metric"><strong>35</strong><span>Documented frontend surfaces and aliases across public, auth, client, and vendor route groups.</span></div>
+          <div class="metric"><strong>2</strong><span>Distinct product experiences: client booking marketplace and vendor operations.</span></div>
+          <div class="metric"><strong>4</strong><span>Route responsibilities preserved: public browsing, auth, client actions, vendor operations.</span></div>
+        </div>
+      </section>
+
+      <div class="print-hint">
+        <span>Tip: use browser print to PDF or capture each phone frame for design review decks.</span>
+        <span class="tag">Open directly as HTML</span>
+      </div>
+
+      <section id="all-screens" class="section">
+        <div class="section-header">
+          <div>
+            <h2>All Screens Board</h2>
+            <p>A Figma-style overview canvas showing every current frontend screen together, grouped by product flow. Scroll sideways to inspect the full board and capture stakeholder screenshots.</p>
+          </div>
+          <span class="tag">Every Screen Together</span>
+        </div>
+        <div class="figma-board" aria-label="All AutoServe screens in a Figma style flow board">
+          <div class="board-canvas">
+            <div class="board-lane">
+              <div class="lane-header">
+                <div>
+                  <h3>Public Browse And Conversion</h3>
+                  <p>Guest-first entry through discovery, shop evaluation, and premium upsell.</p>
+                </div>
+                <span class="tag">Public</span>
+              </div>
+              <div class="board-row">
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Entry</span></div>
+                    <div class="mini-title">AutoServe</div>
+                    <div class="mini-copy medium"></div>
+                    <div class="mini-hero"></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-cta accent"></div>
+                    <div class="mini-grid"><div class="mini-cta secondary"></div><div class="mini-cta"></div></div>
+                  </div>
+                  <div class="node-label">Welcome</div>
+                  <div class="node-route">/(public)/welcome</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Guest</span></div>
+                    <div class="mini-title">Nearby service providers</div>
+                    <div class="mini-copy"></div>
+                    <div class="mini-card"><div class="mini-line"></div></div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip"></span><span class="mini-chip"></span></div>
+                    <div class="mini-map"></div>
+                    <div class="mini-card dark"><div class="mini-line white"></div><div class="mini-line white"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                  </div>
+                  <div class="node-label">Discover</div>
+                  <div class="node-route">/(public)/discover</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Shop</span></div>
+                    <div class="mini-hero" style="background-image:linear-gradient(140deg,rgba(11,18,32,.16),rgba(15,76,129,.12)),url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=360&q=70');"></div>
+                    <div class="mini-title">Precision Auto Care</div>
+                    <div class="mini-copy short"></div>
+                    <div class="mini-chip-row"><span class="mini-chip"></span><span class="mini-chip"></span></div>
+                    <div class="mini-map"></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Shop Detail</div>
+                  <div class="node-route">/(public)/shop/[id]</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Premium</span></div>
+                    <div class="mini-card dark" style="min-height:96px;"><div class="mini-line white"></div><div class="mini-line white"></div><div class="mini-line white"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-cta accent"></div>
+                    <div class="mini-cta secondary"></div>
+                  </div>
+                  <div class="node-label">Premium Feature Lock</div>
+                  <div class="node-route">/(public)/premium</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="board-lane">
+              <div class="lane-header">
+                <div>
+                  <h3>Authentication And Vendor Onboarding</h3>
+                  <p>Account creation, role branching, provider setup, review, and completion.</p>
+                </div>
+                <span class="tag">Auth</span>
+              </div>
+              <div class="board-row">
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Auth</span></div>
+                    <div class="mini-title">Welcome back</div>
+                    <div class="mini-copy medium"></div>
+                    <div class="mini-grid"><div class="mini-cta"></div><div class="mini-cta secondary"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div></div>
+                    <div class="mini-cta accent"></div>
+                    <div class="mini-cta secondary"></div>
+                  </div>
+                  <div class="node-label">Login / Signup</div>
+                  <div class="node-route">/(auth)</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Role</span></div>
+                    <div class="mini-title">Choose your experience</div>
+                    <div class="mini-copy"></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-cta"></div></div>
+                    <div class="mini-card"><div class="mini-line accent"></div><div class="mini-line"></div><div class="mini-cta secondary"></div></div>
+                  </div>
+                  <div class="node-label">Role Selection</div>
+                  <div class="node-route">/(auth)/role</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Setup</span></div>
+                    <div class="mini-title">Vendor account?</div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip"></span><span class="mini-chip"></span></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-cta"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div><div class="mini-cta secondary"></div></div>
+                    <div class="mini-cta"></div>
+                  </div>
+                  <div class="node-label">Vendor Account Type</div>
+                  <div class="node-route">/vendor-onboarding/account-type</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Profile</span></div>
+                    <div class="mini-title">Business profile</div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip active"></span><span class="mini-chip"></span></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div></div>
+                  </div>
+                  <div class="node-label">Business Profile</div>
+                  <div class="node-route">/vendor-onboarding/business-info</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Location</span></div>
+                    <div class="mini-title">Location & service area</div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip active"></span><span class="mini-chip active"></span></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div></div>
+                    <div class="mini-map"></div>
+                    <div class="mini-grid"><div class="mini-cta secondary"></div><div class="mini-cta secondary"></div></div>
+                  </div>
+                  <div class="node-label">Location Setup</div>
+                  <div class="node-route">/vendor-onboarding/location</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Catalog</span></div>
+                    <div class="mini-title">Service catalog</div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip active"></span><span class="mini-chip active"></span></div>
+                    <div class="mini-grid"><div class="mini-card dark"><div class="mini-line white"></div></div><div class="mini-card green"><div class="mini-line brand"></div></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip"></span><span class="mini-chip"></span></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Service Catalog</div>
+                  <div class="node-route">/vendor-onboarding/services</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Review</span></div>
+                    <div class="mini-title">Review your setup</div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip active"></span><span class="mini-chip active"></span></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-chip-row"><span class="mini-chip"></span><span class="mini-chip"></span></div><div class="mini-line"></div></div>
+                    <div class="mini-cta"></div>
+                  </div>
+                  <div class="node-label">Review Setup</div>
+                  <div class="node-route">/vendor-onboarding/review</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Done</span></div>
+                    <div class="mini-card green" style="min-height:70px;"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-card green"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-cta"></div>
+                    <div class="mini-cta secondary"></div>
+                  </div>
+                  <div class="node-label">Setup Complete</div>
+                  <div class="node-route">/vendor-onboarding/complete</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="board-lane">
+              <div class="lane-header">
+                <div>
+                  <h3>Client Booking And Garage</h3>
+                  <p>Vehicle ownership, booking draft, checkout, confirmation, history, and profile.</p>
+                </div>
+                <span class="tag">Client</span>
+              </div>
+              <div class="board-row">
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Client</span></div>
+                    <div class="mini-title">Nearby service providers</div>
+                    <div class="mini-card"><div class="mini-line"></div></div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip"></span></div>
+                    <div class="mini-map"></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                  </div>
+                  <div class="node-label">Client Discover</div>
+                  <div class="node-route">/(client)</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Shop</span></div>
+                    <div class="mini-hero"></div>
+                    <div class="mini-title">Vendor Detail</div>
+                    <div class="mini-copy"></div>
+                    <div class="mini-chip-row"><span class="mini-chip"></span><span class="mini-chip"></span></div>
+                    <div class="mini-map"></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Client Shop Detail</div>
+                  <div class="node-route">/(client)/shop/[id]</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Garage</span></div>
+                    <div class="mini-title">My Garage</div>
+                    <div class="mini-copy short"></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-chip-row"><span class="mini-chip"></span><span class="mini-chip"></span></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div><div class="mini-chip-row"><span class="mini-chip"></span><span class="mini-chip"></span></div></div>
+                  </div>
+                  <div class="node-label">My Garage</div>
+                  <div class="node-route">/(client)/vehicles</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Add</span></div>
+                    <div class="mini-title">Add vehicle</div>
+                    <div class="mini-card"><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Add Vehicle</div>
+                  <div class="node-route">/vehicle/garage-add</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Edit</span></div>
+                    <div class="mini-title">Edit vehicle</div>
+                    <div class="mini-card"><div class="mini-line brand"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Edit Vehicle</div>
+                  <div class="node-route">/vehicle/garage-edit</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Manual</span></div>
+                    <div class="mini-title">Vehicle make</div>
+                    <div class="mini-grid"><div class="mini-card"><div class="mini-line"></div><div class="mini-cta secondary"></div></div><div class="mini-card"><div class="mini-line"></div><div class="mini-cta secondary"></div></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Manual Make/Model/Year/Confirm</div>
+                  <div class="node-route">/vehicle/make → confirm</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Pick</span></div>
+                    <div class="mini-title">Select vehicle</div>
+                    <div class="mini-card" style="border-color:var(--brand);"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-chip-row"><span class="mini-chip"></span></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Booking Vehicle</div>
+                  <div class="node-route">/booking/vehicle</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Step 1</span></div>
+                    <div class="mini-title">Booking details</div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Booking Details</div>
+                  <div class="node-route">/booking/service</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Step 2</span></div>
+                    <div class="mini-title">Services & time</div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip active"></span><span class="mini-chip"></span></div>
+                    <div class="mini-card"><div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip"></span></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line brand"></div></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Services, Date, Time</div>
+                  <div class="node-route">/booking/schedule</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Done</span></div>
+                    <div class="mini-card green" style="min-height:78px;"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-cta accent"></div>
+                    <div class="mini-cta secondary"></div>
+                  </div>
+                  <div class="node-label">Confirmation</div>
+                  <div class="node-route">/confirmation</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>History</span></div>
+                    <div class="mini-title">Your bookings</div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip"></span></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-cta secondary"></div></div>
+                  </div>
+                  <div class="node-label">Bookings And Detail</div>
+                  <div class="node-route">/bookings + /booking-detail/[id]</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Me</span></div>
+                    <div class="mini-title">Profile</div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-cta secondary"></div>
+                  </div>
+                  <div class="node-label">Client Profile</div>
+                  <div class="node-route">/(client)/profile</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="board-lane">
+              <div class="lane-header">
+                <div>
+                  <h3>Vendor Operations</h3>
+                  <p>Operational dashboard, service CRUD, booking queue/actions, service area, and account.</p>
+                </div>
+                <span class="tag">Vendor</span>
+              </div>
+              <div class="board-row">
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Ops</span></div>
+                    <div class="mini-title">Vendor dashboard</div>
+                    <div class="mini-grid"><div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div><div class="mini-card"><div class="mini-line accent"></div><div class="mini-line"></div></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div><div class="mini-line accent"></div></div>
+                  </div>
+                  <div class="node-label">Vendor Dashboard</div>
+                  <div class="node-route">/(vendor)</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Catalog</span></div>
+                    <div class="mini-title">Service management</div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div><div class="mini-line"></div><div class="mini-cta accent"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                  </div>
+                  <div class="node-label">Vendor Services</div>
+                  <div class="node-route">/(vendor)/services</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Queue</span></div>
+                    <div class="mini-title">Booking management</div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip"></span><span class="mini-chip"></span></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div><div class="mini-grid"><div class="mini-cta accent"></div><div class="mini-cta secondary"></div></div></div>
+                  </div>
+                  <div class="node-label">Vendor Bookings</div>
+                  <div class="node-route">/(vendor)/bookings</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Action</span></div>
+                    <div class="mini-title">Booking detail</div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-cta accent"></div>
+                    <div class="mini-cta secondary"></div>
+                  </div>
+                  <div class="node-label">Vendor Booking Detail</div>
+                  <div class="node-route">/booking-detail/[id]</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Area</span></div>
+                    <div class="mini-title">Location setup</div>
+                    <div class="mini-card"><div class="mini-line"></div></div>
+                    <div class="mini-map"></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-cta secondary"></div></div>
+                    <div class="mini-card"><div class="mini-line accent"></div><div class="mini-grid"><div class="mini-cta secondary"></div><div class="mini-cta secondary"></div></div></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Vendor Location</div>
+                  <div class="node-route">/(vendor)/location</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Me</span></div>
+                    <div class="mini-title">Vendor profile</div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div><div class="mini-line"></div></div>
+                    <div class="mini-cta secondary"></div>
+                  </div>
+                  <div class="node-label">Vendor Profile</div>
+                  <div class="node-route">/(vendor)/profile</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="board-lane">
+              <div class="lane-header">
+                <div>
+                  <h3>Routing Surfaces And Aliases</h3>
+                  <p>Non-unique visual pages that still matter for QA, app handoff, and route walkthroughs.</p>
+                </div>
+                <span class="tag">Redirects</span>
+              </div>
+              <div class="board-row">
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>/</span></div>
+                    <div class="mini-title">Root</div>
+                    <div class="mini-card green"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Root Redirect</div>
+                  <div class="node-route">/ → /(public)/welcome</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Setup</span></div>
+                    <div class="mini-title">Vendor setup</div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-card"><div class="mini-line"></div><div class="mini-line"></div></div>
+                  </div>
+                  <div class="node-label">Vendor Setup Redirect</div>
+                  <div class="node-route">/(auth)/vendor-setup</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Resume</span></div>
+                    <div class="mini-title">Onboarding entry</div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-chip-row"><span class="mini-chip active"></span><span class="mini-chip"></span><span class="mini-chip"></span></div>
+                  </div>
+                  <div class="node-label">Next Incomplete Step</div>
+                  <div class="node-route">/(auth)/vendor-onboarding</div>
+                </div>
+                <div class="flow-node">
+                  <div class="mini-phone">
+                    <div class="mini-status"><span>9:41</span><span>Moved</span></div>
+                    <div class="mini-title">Redirecting</div>
+                    <div class="mini-copy medium"></div>
+                    <div class="mini-card"><div class="mini-line brand"></div><div class="mini-line"></div></div>
+                    <div class="mini-cta accent"></div>
+                  </div>
+                  <div class="node-label">Legacy Booking Review</div>
+                  <div class="node-route">/booking/review → schedule</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="theme-legend" class="section">
+        <div class="section-header">
+          <div>
+            <h2>Theme Legend</h2>
+            <p>Source-aligned design tokens and theme guidance from `constants/theme.ts`, translated into a presentation-ready style guide.</p>
+          </div>
+          <span class="tag">Design System</span>
+        </div>
+
+        <div class="legend-grid">
+          <div class="theme-card">
+            <div>
+              <span class="eyebrow" style="background:#eff6ff;color:var(--brand);">Theme Type</span>
+              <h3 style="margin-top:14px;">Clean premium marketplace with operational mobile tooling.</h3>
+              <p>
+                AutoServe uses a light, high-trust SaaS marketplace theme: airy backgrounds, white elevated cards,
+                a deep navy foundation, a professional blue brand color, and orange only for high-emphasis conversion actions.
+                The visual tone should feel polished enough for automotive customers and restrained enough for daily vendor operations.
+              </p>
+            </div>
+            <div class="style-token-grid">
+              <div class="style-token"><strong>Product Personality</strong><span>Premium, practical, trustworthy, service-oriented.</span></div>
+              <div class="style-token"><strong>UI Density</strong><span>Mobile-first and card-based, with readable spacing for field work and booking decisions.</span></div>
+              <div class="style-token"><strong>Shape Language</strong><span>Soft rounded mobile surfaces: cards 18-28px, pills fully rounded, phone frames rounded.</span></div>
+              <div class="style-token"><strong>Interaction Style</strong><span>Clear CTAs, filter chips, radio-like cards, segmented tabs, summary cards, status pills.</span></div>
+            </div>
+          </div>
+
+          <div class="theme-card">
+            <h3>Typography And Components</h3>
+            <div class="component-samples">
+              <div class="type-sample">
+                <div class="type-display">Display</div>
+                <div class="type-title">Section title</div>
+                <div class="type-body">Plus Jakarta Sans in the app; Inter/system fallback in this static document. Letter spacing stays neutral, with bold headings and medium-weight body copy.</div>
+              </div>
+              <div class="sample-panel">
+                <div class="button-row"><div class="button">Primary</div><div class="button accent">Accent CTA</div></div>
+                <div class="button-row"><div class="button secondary">Secondary</div><div class="button danger">Destructive</div></div>
+                <div class="chips"><span class="chip active">Active chip</span><span class="chip">Filter chip</span><span class="status good">Completed</span><span class="status">Pending</span></div>
+                <div class="mock-card"><h5>Elevated card</h5><p>Used for service cards, summaries, profile rows, forms, and booking details.</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="theme-card" style="margin-top:20px;">
+          <h3>Core Palette</h3>
+          <div class="swatch-grid">
+            <div class="swatch"><div class="swatch-color" style="background:#F8FAFC;"></div><div class="swatch-meta"><span class="swatch-name">bgBase</span><span class="swatch-value">#F8FAFC</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#FFFFFF;"></div><div class="swatch-meta"><span class="swatch-name">bgElevated</span><span class="swatch-value">#FFFFFF</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#0B1220;"></div><div class="swatch-meta"><span class="swatch-name">bgStrong</span><span class="swatch-value">#0B1220</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#0F4C81;"></div><div class="swatch-meta"><span class="swatch-name">surfaceBrand</span><span class="swatch-value">#0F4C81</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#FF7A1A;"></div><div class="swatch-meta"><span class="swatch-name">surfaceAccent</span><span class="swatch-value">#FF7A1A</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#10B981;"></div><div class="swatch-meta"><span class="swatch-name">surfaceSuccess</span><span class="swatch-value">#10B981</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#ECFDF5;"></div><div class="swatch-meta"><span class="swatch-name">surfaceSubtleGreen</span><span class="swatch-value">#ECFDF5</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#FFF7ED;"></div><div class="swatch-meta"><span class="swatch-name">surfaceSubtleOrange</span><span class="swatch-value">#FFF7ED</span></div></div>
+          </div>
+        </div>
+
+        <div class="theme-card" style="margin-top:20px;">
+          <h3>Text, Borders, And State Colors</h3>
+          <div class="swatch-grid">
+            <div class="swatch"><div class="swatch-color" style="background:#0F172A;"></div><div class="swatch-meta"><span class="swatch-name">textPrimary</span><span class="swatch-value">#0F172A</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#475569;"></div><div class="swatch-meta"><span class="swatch-name">textSecondary</span><span class="swatch-value">#475569</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#94A3B8;"></div><div class="swatch-meta"><span class="swatch-name">textTertiary</span><span class="swatch-value">#94A3B8</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#FFFFFF;"></div><div class="swatch-meta"><span class="swatch-name">textInverse</span><span class="swatch-value">#FFFFFF</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#E2E8F0;"></div><div class="swatch-meta"><span class="swatch-name">borderDefault</span><span class="swatch-value">#E2E8F0</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#CBD5E1;"></div><div class="swatch-meta"><span class="swatch-name">borderStrong</span><span class="swatch-value">#CBD5E1</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#C2410C;"></div><div class="swatch-meta"><span class="swatch-name">pending</span><span class="swatch-value">#C2410C</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#047857;"></div><div class="swatch-meta"><span class="swatch-name">completed</span><span class="swatch-value">#047857</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#1D4ED8;"></div><div class="swatch-meta"><span class="swatch-name">info</span><span class="swatch-value">#1D4ED8</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#B91C1C;"></div><div class="swatch-meta"><span class="swatch-name">danger</span><span class="swatch-value">#B91C1C</span></div></div>
+          </div>
+        </div>
+
+        <div class="theme-card" style="margin-top:20px;">
+          <h3>Usage Rules For Presenting The Design</h3>
+          <div class="style-token-grid">
+            <div class="style-token"><strong>Brand Blue</strong><span>Use for navigation, selected states, primary identity, map pins, account setup progress, and trusted marketplace moments.</span></div>
+            <div class="style-token"><strong>Accent Orange</strong><span>Reserve for high-value conversion actions: continue, book appointment, confirm booking, add/save key entities.</span></div>
+            <div class="style-token"><strong>Deep Navy</strong><span>Use for premium contrast surfaces, active chips, featured vendor previews, and high-emphasis summary panels.</span></div>
+            <div class="style-token"><strong>Green</strong><span>Use for success, completion, setup-ready states, and positive status confirmation.</span></div>
+            <div class="style-token"><strong>Orange Subtle</strong><span>Use behind pending or caution messaging without making the app feel error-heavy.</span></div>
+            <div class="style-token"><strong>Red</strong><span>Only for destructive or failed states: delete service, remove vehicle, save failures, validation danger.</span></div>
+            <div class="style-token"><strong>Cards</strong><span>Cards communicate actionable units: vendors, vehicles, services, summaries, forms, and booking details.</span></div>
+            <div class="style-token"><strong>Theme Summary</strong><span>Light automotive service marketplace with premium trust cues and operational clarity for vendors.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <div>
+            <h2>Route Flow Map</h2>
+            <p>High-level sequence based on `.claude/ARCHITECTURE.md` and the current `app/` route tree.</p>
+          </div>
+          <span class="tag">Expo Router</span>
+        </div>
+        <div class="flow-map">
+          <div class="flow-row">
+            <div class="flow-title">Public</div>
+            <div class="flow-steps">
+              <a class="flow-step" href="#welcome">Welcome</a>
+              <a class="flow-step" href="#discover">Discover</a>
+              <a class="flow-step" href="#shop-detail">Shop Detail</a>
+              <a class="flow-step" href="#premium">Premium Lock</a>
+            </div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-title">Auth</div>
+            <div class="flow-steps">
+              <a class="flow-step" href="#auth-index">Login / Signup</a>
+              <a class="flow-step" href="#role-selection">Role Selection</a>
+              <a class="flow-step" href="#vendor-account">Vendor Account Type</a>
+              <a class="flow-step" href="#vendor-business">Business Profile</a>
+              <a class="flow-step" href="#vendor-location-onboarding">Location Area</a>
+              <a class="flow-step" href="#vendor-services-onboarding">Service Catalog</a>
+              <a class="flow-step" href="#vendor-review">Review Setup</a>
+              <a class="flow-step" href="#vendor-complete">Complete</a>
+            </div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-title">Client</div>
+            <div class="flow-steps">
+              <a class="flow-step" href="#client-garage">My Garage</a>
+              <a class="flow-step" href="#garage-add">Add Vehicle</a>
+              <a class="flow-step" href="#manual-make">Manual Vehicle</a>
+              <a class="flow-step" href="#booking-vehicle">Select Vehicle</a>
+              <a class="flow-step" href="#booking-details">Booking Details</a>
+              <a class="flow-step" href="#booking-schedule">Services and Time</a>
+              <a class="flow-step" href="#confirmation">Confirmation</a>
+              <a class="flow-step" href="#client-bookings">My Bookings</a>
+              <a class="flow-step" href="#client-profile">Profile</a>
+            </div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-title">Vendor</div>
+            <div class="flow-steps">
+              <a class="flow-step" href="#vendor-dashboard">Dashboard</a>
+              <a class="flow-step" href="#vendor-services">Services</a>
+              <a class="flow-step" href="#vendor-bookings">Bookings</a>
+              <a class="flow-step" href="#vendor-booking-detail">Booking Detail</a>
+              <a class="flow-step" href="#vendor-location">Location</a>
+              <a class="flow-step" href="#vendor-profile">Profile</a>
+            </div>
+          </div>
+        </div>
+        <p class="doc-note">
+          Design guardrails: guest browsing must stay available, multi-step flows must remain reversible,
+          booking draft state must persist across steps, and client/vendor controls must stay separate.
+        </p>
+
+        <article id="redirects" class="page-card">
+          <div class="page-card-header">
+            <div>
+              <h3>Route Aliases And Redirects</h3>
+              <span class="route">/, /(auth)/vendor-setup, /(auth)/vendor-onboarding, /(client)/booking/review</span>
+            </div>
+            <span class="tag">Routing</span>
+          </div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>These routes do not introduce unique visual layouts, but they are part of the frontend contract and should stay documented for QA and stakeholder walkthroughs.</p></div>
+              <div class="spec-block"><h4>Behavior</h4><ul><li>`/` redirects to `/(public)/welcome`.</li><li>`/(auth)/vendor-setup` redirects to `/(auth)/vendor-onboarding`.</li><li>`/(auth)/vendor-onboarding` loads any saved setup draft and redirects to the next incomplete onboarding step.</li><li>`/(client)/booking/review` redirects to `/(client)/booking/schedule` with a short "Redirecting" message.</li><li>`/(client)` reuses Discover with client shop routes; `/(public)/shop/[id]` and `/(client)/shop/[id]` reuse the same Shop Detail screen with different back targets.</li></ul></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Router</span></div>
+              <h4>Redirecting</h4>
+              <p>We moved confirmation into the booking wizard so you can finish in two steps.</p>
+              <div class="mock-card"><h5>Routing aliases</h5><div class="summary-row"><span>/</span><strong>Welcome</strong></div><div class="summary-row"><span>Vendor setup</span><strong>Next onboarding step</strong></div><div class="summary-row"><span>Booking review</span><strong>Schedule</strong></div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="public" class="section">
+        <div class="section-header">
+          <div>
+            <h2>Public Pages</h2>
+            <p>Non-authenticated entry, discovery, vendor evaluation, and premium locked-state marketing.</p>
+          </div>
+          <span class="tag">Guest-friendly</span>
+        </div>
+
+        <article id="welcome" class="page-card">
+          <div class="page-card-header">
+            <div>
+              <h3>Welcome</h3>
+              <span class="route">/(public)/welcome</span>
+            </div>
+            <span class="tag">Entry</span>
+          </div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Brand entry point that gets users into discovery quickly without forcing authentication.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>AutoServe brand headline and automotive hero image.</li><li>Overlay card with trust/value message.</li><li>Continue as Guest, Sign Up, and Log In actions.</li></ul></div>
+              <div class="spec-block"><h4>Owner Talking Points</h4><p>Positions AutoServe as premium but keeps conversion friction low by making guest browsing the dominant action.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>AutoServe</span></div>
+              <div>
+                <h4>AutoServe</h4>
+                <p>Premium automotive care at your fingertips.</p>
+              </div>
+              <div class="hero-image"></div>
+              <div class="mock-card" style="margin-top:-52px;margin-left:18px;margin-right:18px;">
+                <h5>Transparency every turn.</h5>
+                <p>Certified technicians, upfront pricing, and mobile service options when you need them most.</p>
+              </div>
+              <div class="phone-footer">
+                <div class="button accent">Continue as Guest</div>
+                <div class="button-row"><div class="button secondary">Sign Up</div><div class="button">Log In</div></div>
+                <p class="caption" style="text-align:center;">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
+              </div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="discover" class="page-card">
+          <div class="page-card-header">
+            <div>
+              <h3>Discover</h3>
+              <span class="route">/(public)/discover and /(client)</span>
+            </div>
+            <span class="tag">Shared Screen</span>
+          </div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Browse nearby vendors through search, filters, map/list switching, and vendor cards.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Search input for shops, services, and mobile mechanics.</li><li>Map View/List View segmented filters.</li><li>Mobile Service and Rating 4.5+ chips.</li><li>Map preview and Available now vendor list.</li></ul></div>
+              <div class="spec-block"><h4>States</h4><p>Loading, query error, empty filter results, guest tabs, and authenticated profile shortcut.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Guest</span></div>
+              <div class="mock-header"><h4>Nearby service providers</h4><div class="back">U</div></div>
+              <p>Search tires, oil changes, diagnostics, and mobile mechanics around you.</p>
+              <div class="chips"><span class="chip active">Guest</span><span class="chip">Log In</span></div>
+              <div class="input">Search shops, services, or mobile mechanics</div>
+              <div class="chips"><span class="chip active">Map View</span><span class="chip">List View</span><span class="chip">Mobile Service</span><span class="chip">Rating 4.5+</span></div>
+              <div class="map"><span class="pin one"></span><span class="pin two"></span></div>
+              <div class="mock-card dark"><h5>Precision Auto Care</h5><p style="color:#dbeafe;">Star 4.9 · Today 3:00 PM</p></div>
+              <div class="section-title">Available now <span>12 results</span></div>
+              <div class="vendor-card"><div class="vendor-top"><div><strong>Precision Auto Care</strong><p>Oil, tires, diagnostics</p></div><span class="status good">4.9</span></div><p class="caption">2.4 mi · Mobile service available</p></div>
+              <div class="vendor-card"><div class="vendor-top"><div><strong>Rapid Tire Lab</strong><p>Tires and balancing</p></div><span class="status good">4.7</span></div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="shop-detail" class="page-card">
+          <div class="page-card-header">
+            <div>
+              <h3>Shop Detail</h3>
+              <span class="route">/(public)/shop/[id] and /(client)/shop/[id]</span>
+            </div>
+            <span class="tag">Conversion</span>
+          </div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Help the user evaluate a single vendor before starting the booking flow.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Back header, hero image, vendor name, rating, reviews, and description.</li><li>Services grid, location map, address, business hours, and reviews.</li><li>Sticky Book Appointment footer.</li></ul></div>
+              <div class="spec-block"><h4>Flow Impact</h4><p>Booking clears prior draft, stores vendor ID, preserves guest mode when needed, then routes to client vehicle selection.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Shop</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div class="shop-image"></div>
+              <div><h4>Precision Auto Care</h4><p>Top rated · Star 4.9 (214 reviews)</p><p>Certified technicians for same-day diagnostics, tires, brakes, and maintenance.</p></div>
+              <div class="section-title">Our Services <span>View all</span></div>
+              <div class="chips"><span class="chip">Oil Change $80</span><span class="chip">Brake Inspection $55</span><span class="chip">Diagnostic Scan $120</span></div>
+              <div class="section-title">Location</div>
+              <div class="map"><span class="pin one"></span></div>
+              <p>1234 Main St, Los Angeles, CA 90001</p>
+              <div class="mock-card"><h5>Business Hours</h5><div class="summary-row"><span>Mon-Fri</span><strong>8 AM-6 PM</strong></div><div class="summary-row"><span>Sat</span><strong>9 AM-4 PM</strong></div></div>
+              <div class="phone-footer"><div class="button accent">Book Appointment</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="premium" class="page-card">
+          <div class="page-card-header">
+            <div>
+              <h3>Premium Feature Lock</h3>
+              <span class="route">/(public)/premium</span>
+            </div>
+            <span class="tag">Deferred</span>
+          </div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Market auto vehicle detection while preserving the manual vehicle-selection path.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Dark camera-style lock panel.</li><li>Benefit list for instant suggestions, repeat bookings, and better recommendations.</li><li>Unlock Premium Feature and Back to Vehicle Flow actions.</li></ul></div>
+              <div class="spec-block"><h4>Risk To Preserve</h4><p>This page must not trap users or block the basic booking flow.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Premium</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><h5>Premium Feature</h5><span></span></div>
+              <div class="mock-card dark" style="text-align:center;padding:30px 18px;"><div style="font-size:44px;">LOCK</div><h4 style="color:#fff;">Auto Vehicle Detection</h4><p style="color:#cbd5e1;">Upgrade to Premium to auto-detect your vehicle with just a photo. Manual selection remains available anytime.</p></div>
+              <div class="mock-card"><h5>Why unlock it?</h5><p>* Instant make, model, and year suggestions</p><p>* Faster repeat bookings</p><p>* Better service recommendations</p></div>
+              <div class="phone-footer"><div class="button accent">Unlock Premium Feature</div><div class="button secondary">Back to Vehicle Flow</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="auth" class="section">
+        <div class="section-header">
+          <div>
+            <h2>Auth And Vendor Setup</h2>
+            <p>Authentication, role selection, and the complete vendor onboarding sequence.</p>
+          </div>
+          <span class="tag">Role Routing</span>
+        </div>
+
+        <article id="auth-index" class="page-card">
+          <div class="page-card-header"><div><h3>Login / Signup</h3><span class="route">/(auth)</span></div><span class="tag">Auth</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Email and Google authentication with post-auth routing back to selected role or pending booking path.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Welcome back or create account header.</li><li>Log In/Sign Up toggle.</li><li>Full name field for signup, email, password.</li><li>Continue with Google and loading modal.</li></ul></div>
+              <div class="spec-block"><h4>States</h4><p>Submitting, Google loading overlay, confirmation pending, and error alert.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Auth</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>Welcome back</h4><p>Use email or Google to manage bookings across iOS and Android.</p></div>
+              <div class="button-row"><div class="button">Log In</div><div class="button secondary">Sign Up</div></div>
+              <div class="input">Email address</div><div class="input">Password</div>
+              <div class="phone-footer"><div class="button accent">Log In</div><div class="button secondary">Continue with Google</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="role-selection" class="page-card">
+          <div class="page-card-header"><div><h3>Role Selection</h3><span class="route">/(auth)/role</span></div><span class="tag">Branch</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Assign client or vendor role after sign-in, then send users to the correct product experience.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Client App card for browsing and bookings.</li><li>Vendor App card for shop setup and operations.</li><li>Back path to auth.</li></ul></div>
+              <div class="spec-block"><h4>Routing</h4><p>Client returns to post-auth path or client discover. Vendor goes to vendor onboarding setup.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Role</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>Choose your AutoServe experience</h4><p>One account, two paths: book service as a driver or manage jobs as a vendor.</p></div>
+              <div class="mock-card"><h5>Client App</h5><p>Browse nearby providers, select your vehicle, and complete bookings in a few quick steps.</p><div class="button">Continue as Client</div></div>
+              <div class="mock-card"><h5>Vendor App</h5><p>Set up your shop, manage services, define your mobile radius, and accept bookings.</p><div class="button secondary">Continue as Vendor</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="vendor-account" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Onboarding: Account Type</h3><span class="route">/(auth)/vendor-onboarding/account-type</span></div><span class="tag">Step 1</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Choose how AutoServe should present the vendor: business shop or solo vendor.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Onboarding progress bar.</li><li>Business shop selection card.</li><li>Solo vendor selection card.</li><li>Continue and Save & exit footer.</li></ul></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Setup</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>What kind of vendor account?</h4><p>Your account type shapes how AutoServe presents your business to clients.</p></div>
+              <div class="step-progress"><span class="done"></span><span></span><span></span><span></span><span></span></div>
+              <div class="mock-card"><h5>Business shop</h5><p>Best for fixed locations with a team and a consistent storefront.</p><div class="button">Select Business</div></div>
+              <div class="mock-card"><h5>Solo vendor</h5><p>Best for independent mobile mechanics traveling directly to customers.</p><div class="button secondary">Select Solo Vendor</div></div>
+              <div class="phone-footer"><div class="button">Continue</div><div class="button ghost">Save & exit</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="vendor-business" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Onboarding: Business Profile</h3><span class="route">/(auth)/vendor-onboarding/business-info</span></div><span class="tag">Step 2</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Collect marketplace-facing business identity, contact details, optional website/social, and future brand asset hooks.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Identity card: business name and bio.</li><li>Contact card: name, email, phone.</li><li>Online presence card: website and social handle.</li><li>Disabled logo and cover upload placeholders.</li></ul></div>
+              <div class="spec-block"><h4>Validation</h4><p>Requires valid names, email, phone, and a description of at least 10 characters before continuing.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Profile</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>Business profile</h4><p>Clients see this when browsing AutoServe. Clear basics build trust and bookings.</p></div>
+              <div class="step-progress"><span class="done"></span><span class="done"></span><span></span><span></span><span></span></div>
+              <div class="mock-card"><div class="section-title">Identity</div><div class="input">Business name</div><div class="input" style="min-height:76px;">Business bio</div></div>
+              <div class="mock-card"><div class="section-title">Contact</div><div class="input">Contact name</div><div class="input">Business email</div><div class="input">Phone number</div></div>
+              <div class="mock-card"><div class="section-title">Brand assets <span>Optional</span></div><p>Upload your logo and a storefront photo.</p><div class="input">Add logo - coming soon</div></div>
+              <div class="phone-footer"><div class="button">Continue</div><div class="button ghost">Save & exit</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="vendor-location-onboarding" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Onboarding: Location And Service Area</h3><span class="route">/(auth)/vendor-onboarding/location</span></div><span class="tag">Step 3</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Define whether customers visit a shop, receive mobile service, or choose a hybrid model.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Mode picker for fixed, mobile, or hybrid.</li><li>Address input with geocoding and current-location option.</li><li>Map pin confirmation and radius controls for mobile/hybrid vendors.</li></ul></div>
+              <div class="spec-block"><h4>Continue Requirement</h4><p>Needs mode, address, coordinates, and a positive travel radius where applicable.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Location</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>Location & service area</h4><p>Tell clients where to find you and how far you'll travel for a job.</p></div>
+              <div class="step-progress"><span class="done"></span><span class="done"></span><span class="done"></span><span></span><span></span></div>
+              <div class="mock-card"><div class="section-title">How do you serve customers?</div><div class="vendor-card">Fixed location</div><div class="vendor-card">Mobile service</div><div class="vendor-card" style="border-color:var(--brand);background:#ebf3fc;">Hybrid (shop + mobile)</div></div>
+              <div class="mock-card"><div class="section-title">Shop address</div><div class="input">1234 Main St, Los Angeles, CA</div><div class="button secondary">Use my current location</div></div>
+              <div class="map"><span class="pin one"></span></div>
+              <div class="mock-card"><h5 style="text-align:center;color:var(--brand);">25 miles</h5><div class="button-row"><div class="button secondary">- 5</div><div class="button secondary">+ 5</div></div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="vendor-services-onboarding" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Onboarding: Service Catalog</h3><span class="route">/(auth)/vendor-onboarding/services</span></div><span class="tag">Step 4</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Build the vendor's initial marketplace service catalog with starters and manual service editing.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Catalog snapshot metrics.</li><li>Quick starter service tiles.</li><li>Add/edit service form with category chips, duration, price, description, and visibility toggle.</li><li>Current services list with Edit and Enable/Disable actions.</li></ul></div>
+              <div class="spec-block"><h4>Validation</h4><p>At least one valid service is required, and unsaved editor drafts must be saved or discarded before continuing.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Services</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>Build your service catalog</h4><p>Start with your core offers now. You can add depth later without cluttering setup.</p></div>
+              <div class="step-progress"><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span><span></span></div>
+              <div class="mock-card"><div class="section-title">Catalog snapshot <span>3 services</span></div><div class="button-row"><div class="mock-card dark"><strong>3</strong><p style="color:#dbeafe;">Visible now</p></div><div class="mock-card green"><strong>2</strong><p>Categories</p></div></div></div>
+              <div class="mock-card"><div class="section-title">Quick starters <span>Optional</span></div><div class="service-card"><strong>Oil Change</strong><p>Oil · $80</p></div><div class="service-card"><strong>Brake Inspection</strong><p>Brakes · $55</p></div></div>
+              <div class="mock-card"><div class="section-title">Add a service</div><div class="input">Service name</div><div class="chips"><span class="chip active">Oil</span><span class="chip">Brakes</span><span class="chip">Tire</span></div><div class="button-row"><div class="input">45 min</div><div class="input">$95</div></div><div class="button accent">Add service</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="vendor-review" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Onboarding: Review Setup</h3><span class="route">/(auth)/vendor-onboarding/review</span></div><span class="tag">Step 5</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Final verification page before creating or updating the vendor marketplace presence.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Account card with edit affordance.</li><li>Location card with mode, address, radius.</li><li>Service card with enabled/hidden/category summary and service rows.</li><li>Finish setup CTA.</li></ul></div>
+              <div class="spec-block"><h4>States</h4><p>Submit disabled until draft is ready, submitting label, and error banner on failure.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Review</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>Review your setup</h4><p>Check your details before finishing.</p></div>
+              <div class="step-progress"><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span></div>
+              <div class="mock-card"><div class="section-title">Account <span>Edit</span></div><div class="summary-row"><span>Type</span><strong>Business shop</strong></div><div class="summary-row"><span>Business name</span><strong>Suri Auto & Tire</strong></div></div>
+              <div class="mock-card"><div class="section-title">Location <span>Edit</span></div><div class="summary-row"><span>Mode</span><strong>Hybrid</strong></div><div class="summary-row"><span>Service radius</span><strong>25 mi</strong></div></div>
+              <div class="mock-card"><div class="section-title">Services <span>Edit</span></div><div class="chips"><span class="chip">3 enabled</span><span class="chip">0 hidden</span></div><div class="service-card"><strong>Oil Change</strong><p>Oil · 30 min · $80</p><span class="status good">Enabled</span></div></div>
+              <div class="phone-footer"><div class="button">Finish setup</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="vendor-complete" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Onboarding Complete</h3><span class="route">/(auth)/vendor-onboarding/complete</span></div><span class="tag">Success</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Confirm vendor setup completion and route the owner into operational next steps.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Completion crest.</li><li>Saved setup checklist.</li><li>Recommended next-step rows for services, location, dashboard, and profile.</li><li>Go to dashboard and Review setup again footer actions.</li></ul></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Done</span></div>
+              <div style="text-align:center;display:grid;gap:8px;padding:18px 0;"><div style="font-size:54px;color:var(--brand);">OK</div><h4>You're set up</h4><p>Suri Auto & Tire is live on AutoServe.</p></div>
+              <div class="mock-card"><h5>Setup complete</h5><p>* Business profile saved</p><p>* Location and service area set</p><p>* 3 of 3 services enabled</p></div>
+              <div class="mock-card green"><div class="section-title">Recommended next steps <span>Optional</span></div><div class="service-card"><strong>Review your live services</strong><p>Edit catalog, toggle visibility, and refine pricing.</p></div><div class="service-card"><strong>Confirm your location and radius</strong><p>Update address, service area, and mobile coverage.</p></div><div class="service-card"><strong>Open your operational dashboard</strong></div></div>
+              <div class="phone-footer"><div class="button">Go to dashboard</div><div class="button ghost">Review setup again</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="client" class="section">
+        <div class="section-header">
+          <div>
+            <h2>Client Pages</h2>
+            <p>Customer-owned garage, booking flow, confirmations, history, and profile state.</p>
+          </div>
+          <span class="tag">Booking Marketplace</span>
+        </div>
+
+        <article id="client-garage" class="page-card">
+          <div class="page-card-header"><div><h3>My Garage</h3><span class="route">/(client)/vehicles</span></div><span class="tag">Vehicle CRUD</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Manage saved vehicles for faster bookings, including default vehicle selection.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Header with Add shortcut.</li><li>Vehicle cards showing nickname, make/model/year, color, plate, and Default badge.</li><li>Set as default, Edit, and Remove actions.</li></ul></div>
+              <div class="spec-block"><h4>States</h4><p>Unauthenticated sign-in prompt, loading spinner, empty garage, pull-to-refresh, delete confirmation alert.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Garage</span></div>
+              <div class="mock-header"><h4>My Garage</h4><span class="chip">+ Add</span></div>
+              <p>Saved vehicles for faster booking.</p>
+              <div class="mock-card"><div class="row-between"><div><h5>Daily driver</h5><p>2020 Toyota Camry</p><p class="caption">Midnight Blue · ABC 1234</p></div><span class="status">Default</span></div><div class="chips"><span class="chip">Edit</span><span class="chip">Remove</span></div></div>
+              <div class="mock-card"><h5>2018 Honda Civic</h5><p class="caption">White · XYZ 9912</p><div class="chips"><span class="chip">Set as default</span><span class="chip">Edit</span><span class="chip">Remove</span></div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="garage-add" class="page-card">
+          <div class="page-card-header"><div><h3>Add / Edit Vehicle</h3><span class="route">/(client)/vehicle/garage-add and garage-edit</span></div><span class="tag">Form</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Create or update saved vehicle records with searchable make, model, and year pickers.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Searchable pickers with cascading disabled states.</li><li>Optional nickname, color, and license plate fields.</li><li>Save Vehicle or Save Changes CTA.</li></ul></div>
+              <div class="spec-block"><h4>Booking Integration</h4><p>When launched from booking vehicle selection, save returns to the booking flow and writes the new vehicle ID into the draft.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Vehicle</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>Add vehicle</h4><p>Search for your vehicle or enter it manually if it's not in the list.</p></div>
+              <div class="field-label">Make *</div><div class="input">Search makes...</div>
+              <div class="field-label">Model *</div><div class="input">Search models...</div>
+              <div class="field-label">Year *</div><div class="input">Search years...</div>
+              <div class="field-label">Nickname</div><div class="input">Daily driver (optional)</div>
+              <div class="field-label">Color</div><div class="input">Midnight Blue (optional)</div>
+              <div class="field-label">License plate</div><div class="input">ABC 1234 (optional)</div>
+              <p class="caption">This will be set as your default vehicle.</p>
+              <div class="phone-footer"><div class="button accent">Save Vehicle</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="manual-make" class="page-card">
+          <div class="page-card-header"><div><h3>Manual Vehicle Make / Model / Year / Confirm</h3><span class="route">/(client)/vehicle/make -> model -> year -> confirm</span></div><span class="tag">Legacy Flow</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>One-choice-per-screen manual vehicle selector that remains available for booking and premium fallback.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Step 01 make grid with Choose buttons.</li><li>Step 02 model list.</li><li>Step 03 year list.</li><li>Confirm vehicle summary with premium unlock secondary action.</li></ul></div>
+              <div class="spec-block"><h4>Navigation Rule</h4><p>Every step has a back path and preserves selections in the booking draft.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Manual</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>Step 01 of 03</h4><p>Select the vehicle make for this booking.</p></div>
+              <div class="button-row"><div class="mock-card"><h5>Toyota</h5><div class="button secondary">Choose</div></div><div class="mock-card"><h5>Honda</h5><div class="button secondary">Choose</div></div></div>
+              <div class="mock-card"><h5>Confirm your vehicle</h5><div class="summary-row"><span>Make</span><strong>Toyota</strong></div><div class="summary-row"><span>Model</span><strong>Camry</strong></div><div class="summary-row"><span>Year</span><strong>2020</strong></div></div>
+              <div class="phone-footer"><div class="button accent">Continue to Booking Details</div><div class="button secondary">Unlock Auto Vehicle Detection</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="booking-vehicle" class="page-card">
+          <div class="page-card-header"><div><h3>Booking: Select Vehicle</h3><span class="route">/(client)/booking/vehicle</span></div><span class="tag">Booking Step</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Choose a saved vehicle before selecting booking details.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Saved vehicle picker rows with radio indicators.</li><li>Default badge where applicable.</li><li>Add new vehicle link.</li><li>Continue button disabled until a vehicle is selected.</li></ul></div>
+              <div class="spec-block"><h4>States</h4><p>Sign-in required when not in guest mode, vendor missing, loading, no saved vehicles, and normal selection state.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Booking</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>Select vehicle</h4><p>Choose the vehicle for this booking.</p></div>
+              <div class="mock-card" style="border-color:var(--brand);"><div class="row-between"><div><h5>Daily driver</h5><p>2020 Toyota Camry</p><p class="caption">Midnight Blue · ABC 1234</p></div><span class="status">Default</span></div></div>
+              <div class="mock-card"><h5>2018 Honda Civic</h5><p class="caption">White · XYZ 9912</p></div>
+              <span class="chip">+ Add new vehicle</span>
+              <div class="phone-footer"><div class="button accent">Continue</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="booking-details" class="page-card">
+          <div class="page-card-header"><div><h3>Booking: Details</h3><span class="route">/(client)/booking/service</span></div><span class="tag">Displayed Step 1</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Confirm selected vehicle, choose shop/mobile mode, and capture problem notes before selecting services and time.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Booking summary for vendor and vehicle.</li><li>Shop Visit and Mobile Service mode cards.</li><li>Issue details multiline field.</li><li>What happens next summary.</li></ul></div>
+              <div class="spec-block"><h4>Documentation Note</h4><p>The route name says `booking/service`, but the visible screen title is "1. Booking details".</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Details</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>1. Booking details</h4><p>Confirm the vehicle, choose how the service happens, and share any issue details.</p></div>
+              <div class="mock-card"><h5>Selected vehicle</h5><div class="summary-row"><span>Vendor</span><strong>Precision Auto</strong></div><div class="summary-row"><span>Vehicle</span><strong>Daily driver</strong></div></div>
+              <div class="mock-card"><div class="section-title">Service type</div><div class="vendor-card" style="border-color:var(--brand);background:#f6fbff;"><strong>Shop Visit</strong><p>Bring your car to the vendor address.</p></div><div class="vendor-card"><strong>Mobile Service</strong><p>Have the mechanic come to you.</p></div></div>
+              <div class="mock-card"><div class="section-title">Describe the problem <span>Optional</span></div><div class="input" style="min-height:82px;">Brake squeal at low speed...</div></div>
+              <div class="phone-footer"><div class="button accent">Continue to Service & Time</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="booking-schedule" class="page-card">
+          <div class="page-card-header"><div><h3>Booking: Services, Date, Time, Confirm</h3><span class="route">/(client)/booking/schedule</span></div><span class="tag">Displayed Step 2</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Select one or more services, choose appointment date/time, review estimate, then confirm or sign in to confirm.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Booking request summary.</li><li>ServiceCard grid with active states.</li><li>Date chips for the next seven days.</li><li>Available time slot chips.</li><li>Total estimate summary and validation text.</li></ul></div>
+              <div class="spec-block"><h4>Auth Behavior</h4><p>Guests can build the draft but must sign in before persistence. The post-auth path returns them to vehicle selection.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Checkout</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><span></span></div>
+              <div><h4>2. Services, date, and time</h4><p>Choose the work you need, then lock in a date and available time slot.</p></div>
+              <div class="mock-card"><h5>Booking request</h5><div class="summary-row"><span>Vendor</span><strong>Precision Auto</strong></div><div class="summary-row"><span>Vehicle</span><strong>Daily driver</strong></div><div class="summary-row"><span>Service type</span><strong>Shop Visit</strong></div></div>
+              <div class="section-title">Select services <span>Choose one or more</span></div>
+              <div class="chips"><span class="chip active">Oil Change $80</span><span class="chip active">Brake Inspection $55</span><span class="chip">Diagnostic $120</span></div>
+              <div class="mock-card"><div class="section-title">Appointment date</div><div class="chips"><span class="chip active">Tomorrow</span><span class="chip">Fri, Jun 12</span><span class="chip">Sat, Jun 13</span></div></div>
+              <div class="mock-card"><div class="section-title">Available time slots <span>Tomorrow</span></div><div class="chips"><span class="chip">8:30 AM</span><span class="chip active">10:00 AM</span><span class="chip">1:30 PM</span></div></div>
+              <div class="mock-card"><h5>Total estimate</h5><div class="summary-row"><span>Subtotal</span><strong>$135.00</strong></div><div class="summary-row"><span>Service fee</span><strong>$16.20</strong></div><div class="summary-row"><span>Estimated total</span><strong>$151.20</strong></div></div>
+              <div class="phone-footer"><div class="button accent">Confirm Booking</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="confirmation" class="page-card">
+          <div class="page-card-header"><div><h3>Booking Confirmation</h3><span class="route">/(client)/confirmation?bookingId=...</span></div><span class="tag">Success</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Confirm success, summarize the submitted booking, and route to next actions.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Success badge.</li><li>Booking summary: vendor, services, date/time, status.</li><li>Next steps: tracking, service type, estimate.</li><li>View My Bookings and Back to Discovery actions.</li></ul></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Success</span></div>
+              <div style="text-align:center;display:grid;gap:12px;padding-top:70px;"><div style="width:88px;height:88px;border-radius:44px;background:var(--subtle-green);display:grid;place-items:center;margin:auto;color:var(--success);font-size:36px;font-weight:900;">OK</div><h4>Booking confirmed</h4><p>Your request is in and visible in My Bookings. Reference: bk_1024</p></div>
+              <div class="mock-card"><h5>Booking summary</h5><div class="summary-row"><span>Vendor</span><strong>Precision Auto</strong></div><div class="summary-row"><span>Services</span><strong>Oil Change, Brake Inspection</strong></div><div class="summary-row"><span>Status</span><strong>pending</strong></div></div>
+              <div class="mock-card"><h5>Next steps</h5><div class="summary-row"><span>Tracking</span><strong>My Bookings</strong></div><div class="summary-row"><span>Estimate</span><strong>$151.20</strong></div></div>
+              <div class="phone-footer"><div class="button accent">View My Bookings</div><div class="button secondary">Back to Discovery</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="client-bookings" class="page-card">
+          <div class="page-card-header"><div><h3>Client Bookings And Detail</h3><span class="route">/(client)/bookings and /(client)/booking-detail/[id]</span></div><span class="tag">Tracking</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Track upcoming/history bookings and inspect a booking with pricing, service, notes, and disabled future actions.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Upcoming and History filter chips.</li><li>Booking cards with status pill, vendor, services, schedule, price, location.</li><li>Detail page with status, summary, services, pricing, notes.</li><li>Cancel booking where allowed; reschedule/message disabled as coming soon.</li></ul></div>
+              <div class="spec-block"><h4>States</h4><p>Guest sign-in prompt, no upcoming bookings, no history, not found detail, and loading detail.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Bookings</span></div>
+              <h4>Your bookings</h4><p>Track confirmed and pending service requests here.</p>
+              <div class="tabs"><span class="chip active">Upcoming</span><span class="chip">History</span></div>
+              <div class="booking-card"><div class="row-between"><strong>Precision Auto Care</strong><span class="status">Pending</span></div><p>Oil Change · Brake Inspection</p><div class="summary-row"><span>2026-06-12 · 10:00 AM</span><strong>$151.20</strong></div><p class="caption">At the shop</p></div>
+              <div class="mock-card"><h5>Booking detail</h5><div class="summary-row"><span>Date & Time</span><strong>Jun 12 · 10 AM</strong></div><div class="summary-row"><span>Mode</span><strong>At the shop</strong></div><div class="summary-row"><span>Total</span><strong>$151.20</strong></div><div class="button secondary">Cancel booking</div><div class="button secondary disabled">Reschedule</div><p class="caption" style="text-align:center;">Messaging coming soon</p></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="client-profile" class="page-card">
+          <div class="page-card-header"><div><h3>Client Profile</h3><span class="route">/(client)/profile</span></div><span class="tag">Account</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Show current account/session state for clients and guests.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Profile title.</li><li>Account summary: name, email/session state, role.</li><li>Sign Out button when authenticated.</li></ul></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Profile</span></div>
+              <h4>Profile</h4>
+              <div class="mock-card"><h5>Account</h5><div class="summary-row"><span>Name</span><strong>Sandeep Suri</strong></div><div class="summary-row"><span>Email</span><strong>sandeep@example.com</strong></div><div class="summary-row"><span>Role</span><strong>client</strong></div></div>
+              <div class="phone-footer"><div class="button secondary">Sign Out</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="vendor" class="section">
+        <div class="section-header">
+          <div>
+            <h2>Vendor Operations</h2>
+            <p>Authenticated vendor workspace for workload, services, booking status actions, location, and profile.</p>
+          </div>
+          <span class="tag">Operations</span>
+        </div>
+
+        <article id="vendor-dashboard" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Dashboard</h3><span class="route">/(vendor)</span></div><span class="tag">Overview</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Operational hub for upcoming work, earnings, and recent booking activity.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Confirmed bookings and earnings stat cards.</li><li>Manage services callout.</li><li>Latest three booking cards with client, vehicle, services, schedule, notes, and status.</li></ul></div>
+              <div class="spec-block"><h4>States</h4><p>Booking load error and no bookings yet empty state.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Vendor</span></div>
+              <h4>Vendor dashboard</h4><p>Monitor upcoming work, earnings, and customer activity from one operational hub.</p>
+              <div class="button-row"><div class="mock-card"><strong>8</strong><p>Confirmed bookings</p><p class="caption">3 pending review</p></div><div class="mock-card"><strong>$2,430</strong><p>Earnings this week</p><p class="caption">+12% vs last week</p></div></div>
+              <div class="mock-card"><h5>Manage services</h5><p>Update pricing, durations, and mobile-service availability to stay accurate in discovery.</p></div>
+              <div class="booking-card"><strong>Jordan Lee</strong><p>2020 Toyota Camry - Oil Change · Brake Inspection</p><p>Jun 12, 10:00 AM</p><p style="color:var(--info);">Brake squeal at low speed</p><span class="status">PENDING</span></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="vendor-services" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Services</h3><span class="route">/(vendor)/services</span></div><span class="tag">Catalog CRUD</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Manage the services exposed in marketplace discovery.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Service management title and description.</li><li>Add Service form with title, category, duration, and price.</li><li>Existing service rows with duration/price and Delete action.</li></ul></div>
+              <div class="spec-block"><h4>Current Limitation</h4><p>The screen supports add and delete. Rich editing/toggle states exist in onboarding but not this operational page yet.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Services</span></div>
+              <h4>Service management</h4><p>Add, edit, and remove the services you want to expose in the marketplace.</p>
+              <div class="mock-card"><div class="input">title</div><div class="input">category</div><div class="input">durationMinutes</div><div class="input">price</div><div class="button accent">Add Service</div></div>
+              <div class="service-card"><div class="row-between"><div><strong>Oil Change</strong><p>30 mins · $80</p></div><div class="button danger" style="min-height:36px;">Delete</div></div></div>
+              <div class="service-card"><div class="row-between"><div><strong>Brake Inspection</strong><p>40 mins · $55</p></div><div class="button danger" style="min-height:36px;">Delete</div></div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="vendor-bookings" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Bookings</h3><span class="route">/(vendor)/bookings</span></div><span class="tag">Status Queue</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Review incoming and historical booking requests by status.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Status chips: Pending, Confirmed, Completed, Cancelled.</li><li>Booking cards with client, status, vehicle, services, schedule, price, notes, and location.</li><li>Accept and Reject actions for pending bookings.</li></ul></div>
+              <div class="spec-block"><h4>States</h4><p>Error loading bookings and empty state per status tab.</p></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Bookings</span></div>
+              <h4>Booking management</h4><p>Review new requests quickly and keep today's load balanced.</p>
+              <div class="tabs"><span class="chip active">Pending</span><span class="chip">Confirmed</span><span class="chip">Completed</span><span class="chip">Cancelled</span></div>
+              <div class="booking-card"><div class="row-between"><strong>Jordan Lee</strong><span class="status">Pending</span></div><p>2020 Toyota Camry</p><p>Oil Change · Brake Inspection</p><div class="summary-row"><span>Jun 12 · 10 AM</span><strong>$151.20</strong></div><div class="summary-row"><span>User Notes:</span><strong>Brake squeal</strong></div><p class="caption">At the shop</p><div class="button-row"><div class="button accent">Accept</div><div class="button secondary">Reject</div></div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="vendor-booking-detail" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Booking Detail</h3><span class="route">/(vendor)/booking-detail/[id]</span></div><span class="tag">Action Page</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Give vendors full context and the appropriate status mutation actions for a single booking.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Status pill and Customer summary.</li><li>Services, Schedule, Pricing, and Problem description summary cards.</li><li>Optional horizontal photo strip.</li><li>Accept/Reject for pending; Mark completed/Cancel for confirmed.</li><li>Message customer disabled as coming soon.</li></ul></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Detail</span></div>
+              <div class="mock-header"><div class="back">&lt;</div><h5>Booking detail</h5><span></span></div>
+              <span class="status">Pending</span>
+              <div class="mock-card"><h5>Customer</h5><div class="summary-row"><span>Name</span><strong>Jordan Lee</strong></div><div class="summary-row"><span>Vehicle</span><strong>2020 Toyota Camry</strong></div></div>
+              <div class="mock-card"><h5>Services</h5><div class="summary-row"><span>Oil Change</span><strong>$80.00</strong></div><div class="summary-row"><span>Brake Inspection</span><strong>$55.00</strong></div></div>
+              <div class="mock-card"><h5>Schedule</h5><div class="summary-row"><span>Date & Time</span><strong>Jun 12 · 10 AM</strong></div><div class="summary-row"><span>Mode</span><strong>At the shop</strong></div></div>
+              <div class="mock-card"><h5>Problem description</h5><p>Brake squeal at low speed.</p></div>
+              <div class="phone-footer"><div class="button accent">Accept booking</div><div class="button secondary">Reject booking</div><div class="button secondary disabled">Message customer</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="vendor-location" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Location</h3><span class="route">/(vendor)/location</span></div><span class="tag">Service Area</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Update primary shop address, map pin, mobile service availability, and service radius after onboarding.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Shop address field with geocode-on-blur.</li><li>Map pin confirmation when coordinates exist.</li><li>Mobile service enable/disable button.</li><li>Radius display with -5/+5 controls.</li><li>Save Location CTA and save error text.</li></ul></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Location</span></div>
+              <h4>Location setup</h4><p>Set your primary shop location and define how far your mobile service should travel.</p>
+              <div class="mock-card"><div class="section-title">Shop address</div><div class="input">1234 Main St, Los Angeles, CA 90001</div><p class="caption">Type an address and the pin will update automatically.</p></div>
+              <div class="mock-card"><div class="section-title">Confirm your pin</div><div class="map"><span class="pin one"></span></div><p class="caption" style="text-align:center;">Pin: 34.0522, -118.2437</p></div>
+              <div class="mock-card"><h5>Mobile service</h5><div class="button secondary">Disable mobile service</div></div>
+              <div class="mock-card"><h5>Service radius</h5><h4 style="color:var(--brand);">25 miles</h4><div class="button-row"><div class="button secondary">- 5</div><div class="button secondary">+ 5</div></div></div>
+              <div class="phone-footer"><div class="button accent">Save Location</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+
+        <article id="vendor-profile" class="page-card">
+          <div class="page-card-header"><div><h3>Vendor Profile</h3><span class="route">/(vendor)/profile</span></div><span class="tag">Account</span></div>
+          <div class="page-body">
+            <div class="spec-grid">
+              <div class="spec-block"><h4>Purpose</h4><p>Show vendor identity/account summary and sign-out action.</p></div>
+              <div class="spec-block"><h4>Primary UI</h4><ul><li>Vendor profile title.</li><li>Business profile summary: contact, email, account type.</li><li>Sign Out button.</li></ul></div>
+            </div>
+            <div class="screen"><div class="screen-scroll">
+              <div class="phone-status"><span>9:41</span><span>Profile</span></div>
+              <h4>Vendor profile</h4>
+              <div class="mock-card"><h5>Business profile</h5><div class="summary-row"><span>Contact</span><strong>Sandeep Suri</strong></div><div class="summary-row"><span>Email</span><strong>vendor@example.com</strong></div><div class="summary-row"><span>Account type</span><strong>shop</strong></div></div>
+              <div class="phone-footer"><div class="button secondary">Sign Out</div></div>
+              <div class="phone-home"></div>
+            </div></div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
