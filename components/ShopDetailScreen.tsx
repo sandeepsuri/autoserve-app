@@ -2,9 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AllServicesSheet } from '@/components/AllServicesSheet';
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
@@ -27,6 +29,7 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
   const router = useRouter();
   const { clearDraft, updateDraft } = useBookingDraftStore();
   const { session, setGuestMode } = useAuthStore();
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['vendor-detail', id],
@@ -72,6 +75,15 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
     );
   }
 
+  const handleBook = () => {
+    if (!session) {
+      setGuestMode(true);
+    }
+    clearDraft();
+    updateDraft({ vendorId: vendor.id });
+    router.push('/(client)/booking/vehicle');
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.fill} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -83,7 +95,7 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
           <Text style={styles.description}>{vendor.description}</Text>
         </View>
 
-        <SectionHeader title="Our Services" actionLabel="View all" />
+        <SectionHeader title="Our Services" actionLabel="View all" onActionPress={() => setSheetOpen(true)} />
         <View style={styles.grid}>
           {data?.services.map((service) => (
             <ServiceCard key={service.id} service={service} />
@@ -122,16 +134,21 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
         <AppButton
           label="Book Appointment"
           variant="accent"
-          onPress={() => {
-            if (!session) {
-              setGuestMode(true);
-            }
-            clearDraft();
-            updateDraft({ vendorId: vendor.id });
-            router.push('/(client)/booking/vehicle');
-          }}
+          onPress={handleBook}
         />
       </View>
+
+      <AllServicesSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        vendorName={vendor.name}
+        mobileServiceEnabled={vendor.mobileServiceEnabled}
+        services={data?.services ?? []}
+        onBook={() => {
+          setSheetOpen(false);
+          handleBook();
+        }}
+      />
     </SafeAreaView>
   );
 }
