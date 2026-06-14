@@ -4,6 +4,11 @@ import { Service, VendorSummary } from '@/types/domain';
 
 import { isSupabaseConfigured, supabase } from './supabase';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUuid(value: string): boolean {
+  return UUID_REGEX.test(value);
+}
+
 export async function getVendorForOwner(): Promise<VendorSummary | null> {
   const ownerId = useAuthStore.getState().session?.userId;
   if (!ownerId) return null;
@@ -71,14 +76,13 @@ export async function listVendorServices() {
   }));
 }
 
-export async function upsertVendorService(service: Service) {
+export async function upsertVendorService(service: Service): Promise<Service> {
   if (!isSupabaseConfigured || !supabase) {
     useDemoDataStore.getState().upsertService(service);
     return service;
   }
 
-  const { error } = await supabase.from('services').upsert({
-    id: service.id,
+  const payload = {
     vendor_id: service.vendorId,
     title: service.title,
     category: service.category,
@@ -87,10 +91,34 @@ export async function upsertVendorService(service: Service) {
     price: service.price,
     active: service.active,
     image: service.image ?? null,
-  });
+  };
+
+  if (isValidUuid(service.id)) {
+    // Existing row — upsert by known UUID.
+    const { error } = await supabase.from('services').upsert({ id: service.id, ...payload });
+    if (error) throw error;
+    return service;
+  }
+
+  // New row — omit id so Postgres gen_random_uuid() default applies.
+  const { data, error } = await supabase
+    .from('services')
+    .insert(payload)
+    .select()
+    .single();
   if (error) throw error;
 
-  return service;
+  return {
+    id: data.id,
+    vendorId: data.vendor_id,
+    title: data.title,
+    category: data.category,
+    description: data.description ?? undefined,
+    durationMinutes: data.duration_minutes,
+    price: data.price,
+    active: data.active ?? true,
+    image: data.image ?? undefined,
+  };
 }
 
 export async function removeVendorService(serviceId: string) {
