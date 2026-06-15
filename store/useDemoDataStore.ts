@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { demoBookings, demoProfiles, demoReviews, demoServices, demoVehicles, demoVendors } from '@/constants/mock-data';
 import { BookingRecord, Service, UserProfile, Vehicle, VendorOnboardingDraft, VendorSummary } from '@/types/domain';
+import { VendorAvailability } from '@/store/useVendorAvailabilityStore';
 
 interface DemoDataState {
   profiles: UserProfile[];
@@ -12,6 +13,8 @@ interface DemoDataState {
   vehicles: Vehicle[];
   bookings: BookingRecord[];
   onboardingDrafts: VendorOnboardingDraft[];
+  /** Keyed by vendorId; stores persisted availability for demo vendors */
+  vendorAvailabilities: Record<string, VendorAvailability>;
   addOrUpdateProfile: (profile: UserProfile) => void;
   addVehicle: (vehicle: Vehicle) => void;
   updateVehicle: (id: string, patch: Partial<Omit<Vehicle, 'id' | 'ownerId'>>) => void;
@@ -24,6 +27,7 @@ interface DemoDataState {
   updateVendor: (vendorId: string, patch: Partial<VendorSummary>) => void;
   upsertVendor: (vendor: VendorSummary) => void;
   saveOnboardingDraft: (draft: VendorOnboardingDraft) => void;
+  saveVendorAvailability: (vendorId: string, availability: VendorAvailability) => void;
 }
 
 export const useDemoDataStore = create<DemoDataState>()(
@@ -35,6 +39,7 @@ export const useDemoDataStore = create<DemoDataState>()(
       vehicles: demoVehicles,
       bookings: demoBookings,
       onboardingDrafts: [],
+      vendorAvailabilities: {},
       addOrUpdateProfile: (profile) =>
         set((state) => ({
           profiles: state.profiles.some((item) => item.id === profile.id)
@@ -83,6 +88,10 @@ export const useDemoDataStore = create<DemoDataState>()(
             ? state.onboardingDrafts.map((item) => (item.ownerId === draft.ownerId ? draft : item))
             : [draft, ...state.onboardingDrafts],
         })),
+      saveVendorAvailability: (vendorId, availability) =>
+        set((state) => ({
+          vendorAvailabilities: { ...state.vendorAvailabilities, [vendorId]: availability },
+        })),
     }),
     {
       name: 'autoserve-demo-data',
@@ -94,6 +103,7 @@ export const useDemoDataStore = create<DemoDataState>()(
         vehicles: state.vehicles,
         bookings: state.bookings,
         onboardingDrafts: state.onboardingDrafts,
+        vendorAvailabilities: state.vendorAvailabilities,
       }),
     }
   )
