@@ -1,6 +1,8 @@
 import { demoReviewsState, useDemoDataStore } from '@/store/useDemoDataStore';
-import { DiscoveryFilters, Review, Service, VendorSummary } from '@/types/domain';
+import { makeDefaultAvailability } from '@/store/useVendorAvailabilityStore';
+import { DiscoveryFilters, Review, Service, VendorAvailability, VendorSummary } from '@/types/domain';
 
+import { loadVendorAvailability } from './vendor-availability';
 import { isDemoDataEnabled, isSupabaseConfigured, supabase } from './supabase';
 
 const defaultFilters: DiscoveryFilters = {
@@ -90,25 +92,40 @@ export async function listVendors(filters: Partial<DiscoveryFilters> = {}) {
   return filterVendors((data ?? []).map(mapVendorRow), merged);
 }
 
-export async function getVendorDetail(vendorId: string) {
+export async function getVendorDetail(vendorId: string): Promise<{
+  vendor: VendorSummary | null;
+  services: Service[];
+  reviews: Review[];
+  businessHours: { day: string; hours: string }[];
+  availability: VendorAvailability;
+}> {
   if (!isSupabaseConfigured || !supabase) {
     if (!isDemoDataEnabled) {
-      return { vendor: null, services: [] as Service[], reviews: [] as Review[], businessHours: [] as { day: string; hours: string }[] };
+      return {
+        vendor: null,
+        services: [] as Service[],
+        reviews: [] as Review[],
+        businessHours: [] as { day: string; hours: string }[],
+        availability: makeDefaultAvailability(),
+      };
     }
     const demo = useDemoDataStore.getState();
     const vendor = demo.vendors.find((item) => item.id === vendorId) ?? null;
+    const demoAvailability = demo.vendorAvailabilities?.[vendorId] ?? makeDefaultAvailability();
     return {
       vendor,
       services: demo.services.filter((item) => item.vendorId === vendorId && item.active),
       reviews: demoReviewsState.filter((item) => item.vendorId === vendorId),
       businessHours: [] as { day: string; hours: string }[],
+      availability: demoAvailability,
     };
   }
 
-  const [vendorResult, servicesResult, reviewsResult] = await Promise.all([
+  const [vendorResult, servicesResult, reviewsResult, availability] = await Promise.all([
     supabase.from('vendors').select('*').eq('id', vendorId).maybeSingle(),
     supabase.from('services').select('*').eq('vendor_id', vendorId).eq('active', true),
     supabase.from('reviews').select('*').eq('vendor_id', vendorId).order('created_at', { ascending: false }),
+    loadVendorAvailability(vendorId).catch(() => makeDefaultAvailability()),
   ]);
 
   if (vendorResult.error) {
@@ -124,7 +141,13 @@ export async function getVendorDetail(vendorId: string) {
   }
 
   if (!vendorResult.data) {
-    return { vendor: null, services: [] as Service[], reviews: [] as Review[], businessHours: [] as { day: string; hours: string }[] };
+    return {
+      vendor: null,
+      services: [] as Service[],
+      reviews: [] as Review[],
+      businessHours: [] as { day: string; hours: string }[],
+      availability,
+    };
   }
 
   const vendorRow = vendorResult.data as Record<string, unknown>;
@@ -135,5 +158,5 @@ export async function getVendorDetail(vendorId: string) {
   const services = (servicesResult.data ?? []).map(mapServiceRow);
   const reviews = (reviewsResult.data ?? []).map(mapReviewRow);
 
-  return { vendor, services, reviews, businessHours };
+  return { vendor, services, reviews, businessHours, availability };
 }
