@@ -30,6 +30,7 @@ export const useVendorOnboardingStore = create<VendorOnboardingState>()(
             profile: patch.profile ? { ...base.profile, ...patch.profile } : base.profile,
             location: patch.location ? { ...base.location, ...patch.location } : base.location,
             services: patch.services ?? base.services,
+            availabilityConfigured: patch.availabilityConfigured ?? base.availabilityConfigured,
             completed: patch.completed ?? base.completed,
             submittedAt: patch.submittedAt ?? base.submittedAt,
           },

@@ -13,6 +13,13 @@ import {
   LOCATION_MODE_LABELS,
 } from '@/lib/vendor-onboarding-steps';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
+import {
+  countWeeklySlots,
+  DAY_LABELS,
+  DayOfWeek,
+  formatTimeDisplay,
+  useVendorAvailabilityStore,
+} from '@/store/useVendorAvailabilityStore';
 import { ServiceCategory } from '@/types/domain';
 
 const CATEGORY_LABELS: Record<ServiceCategory, string> = {
@@ -29,6 +36,7 @@ const CATEGORY_LABELS: Record<ServiceCategory, string> = {
 export default function ReviewStep() {
   const router = useRouter();
   const { draft } = useVendorOnboardingStore();
+  const { availability } = useVendorAvailabilityStore();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -60,9 +68,13 @@ export default function ReviewStep() {
     }
   };
 
-  const editSection = (stepId: 'account-type' | 'business-info' | 'location' | 'services') => {
+  const editSection = (stepId: 'account-type' | 'business-info' | 'location' | 'services' | 'availability') => {
     router.push(getStep(stepId).route);
   };
+
+  const ORDERED_DAYS: DayOfWeek[] = [1, 2, 3, 4, 5, 6, 0];
+  const openDays = ORDERED_DAYS.filter((d) => availability.weeklyRules[d].bookable);
+  const weeklySlots = countWeeklySlots(availability);
 
   const row = (label: string, value: string | undefined) =>
     value ? (
@@ -104,6 +116,43 @@ export default function ReviewStep() {
         {draft?.location?.serviceRadiusMiles
           ? row('Service radius', `${draft.location.serviceRadiusMiles} mi`)
           : null}
+      </AppCard>
+
+      <AppCard style={styles.card}>
+        <SectionEditRow title="Availability" onEdit={() => editSection('availability')} />
+        {openDays.length > 0 ? (
+          <>
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>Open days</Text>
+              <Text style={styles.rowValue}>{openDays.map((d) => DAY_LABELS[d]).join(', ')}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>Weekly slots</Text>
+              <Text style={styles.rowValue}>{weeklySlots}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>Slot length</Text>
+              <Text style={styles.rowValue}>{availability.slotLengthMinutes} min</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>Capacity / slot</Text>
+              <Text style={styles.rowValue}>{availability.capacityPerSlot}</Text>
+            </View>
+            {openDays.map((d) => {
+              const rule = availability.weeklyRules[d];
+              return (
+                <View style={styles.row} key={d}>
+                  <Text style={styles.rowLabel}>{DAY_LABELS[d]}</Text>
+                  <Text style={styles.rowValue}>
+                    {formatTimeDisplay(rule.openTime)} – {formatTimeDisplay(rule.closeTime)}
+                  </Text>
+                </View>
+              );
+            })}
+          </>
+        ) : (
+          <Text style={styles.rowLabel}>No open days configured. Edit availability before finishing.</Text>
+        )}
       </AppCard>
 
       <AppCard style={styles.card}>
