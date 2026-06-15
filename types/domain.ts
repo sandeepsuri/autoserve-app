@@ -1,3 +1,16 @@
+// Re-export availability types so domain consumers don't need to import from the store
+export type {
+  VendorAvailability,
+  DayRule,
+  DayOfWeek,
+  BlockedPeriod,
+  QuickControls,
+  ServiceModeRules,
+  SlotLengthMinutes,
+  TimeString,
+  TimeBlock,
+} from '@/store/useVendorAvailabilityStore';
+
 export type UserRole = 'client' | 'vendor';
 export type BusinessType = 'shop' | 'solo';
 export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
@@ -96,6 +109,8 @@ export interface VendorOnboardingDraft {
   profile: VendorOnboardingProfileDraft;
   location: VendorOnboardingLocationDraft;
   services: VendorOnboardingServiceDraft[];
+  /** Availability is captured in the onboarding availability step */
+  availabilityConfigured?: boolean;
   completed: boolean;
   submittedAt?: string;
   updatedAt?: string;
@@ -111,6 +126,7 @@ export interface VendorOnboardingDraftPatch {
     serviceRadiusMiles?: number;
   };
   services?: VendorOnboardingServiceDraft[];
+  availabilityConfigured?: boolean;
   completed?: boolean;
   submittedAt?: string;
 }
