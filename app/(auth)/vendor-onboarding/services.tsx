@@ -8,6 +8,7 @@ import { FilterChip } from '@/components/FilterChip';
 import { OnboardingStepShell } from '@/components/onboarding/OnboardingStepShell';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { durationSchema, priceSchema, sanitizeText } from '@/lib/validation';
 import { saveVendorOnboardingDraft } from '@/lib/vendor-onboarding';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 import { ServiceCategory, VendorOnboardingServiceDraft } from '@/types/domain';
@@ -131,18 +132,22 @@ function parseService(editor: ServiceEditorState): VendorOnboardingServiceDraft 
   };
 }
 
+function firstIssueMessage(result: { success: boolean; error?: { issues: { message: string }[] } }) {
+  return result.success ? undefined : result.error?.issues[0]?.message;
+}
+
 function getServiceErrors(editor: ServiceEditorState) {
+  const title = editor.title.trim();
   return {
-    title: editor.title.trim().length < 2 ? 'Add a service name' : undefined,
+    title:
+      title.length < 2
+        ? 'Add a service name'
+        : /[<>]/.test(title)
+          ? 'Service name contains invalid characters'
+          : undefined,
     category: editor.category ? undefined : 'Choose a category',
-    durationMinutes:
-      Number.isFinite(Number(editor.durationMinutes)) && Number(editor.durationMinutes) > 0
-        ? undefined
-        : 'Enter a valid duration',
-    price:
-      Number.isFinite(Number(editor.price)) && Number(editor.price) >= 0
-        ? undefined
-        : 'Enter a valid price',
+    durationMinutes: firstIssueMessage(durationSchema({ max: 1440 }).safeParse(editor.durationMinutes)),
+    price: firstIssueMessage(priceSchema({ max: 100000 }).safeParse(editor.price)),
   };
 }
 
@@ -307,8 +312,9 @@ export default function ServicesStep() {
           label="Service name"
           required
           value={editor.title}
-          onChangeText={(title) => setEditor((current) => ({ ...current, title }))}
+          onChangeText={(title) => setEditor((current) => ({ ...current, title: sanitizeText(title, 60) }))}
           placeholder="e.g. Full Detail, Wheel Alignment, Bumper Repair"
+          maxLength={60}
           errorText={errors.title}
         />
 
@@ -342,6 +348,7 @@ export default function ServicesStep() {
               placeholder="45"
               keyboardType="number-pad"
               helperText="Minutes"
+              maxLength={4}
               errorText={errors.durationMinutes}
             />
           </View>
@@ -354,6 +361,7 @@ export default function ServicesStep() {
               placeholder="95"
               keyboardType="decimal-pad"
               helperText="USD"
+              maxLength={8}
               errorText={errors.price}
             />
           </View>
@@ -362,10 +370,13 @@ export default function ServicesStep() {
         <AppTextField
           label="What’s included"
           value={editor.description}
-          onChangeText={(description) => setEditor((current) => ({ ...current, description }))}
+          onChangeText={(description) =>
+            setEditor((current) => ({ ...current, description: description.replace(/[<>]/g, '').slice(0, 500) }))
+          }
           placeholder="Add a short scope so clients know what they’re booking."
           multiline
           helperText="Optional, but useful for multi-service businesses."
+          maxLength={500}
         />
 
         <View style={styles.visibilityRow}>

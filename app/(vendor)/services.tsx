@@ -25,6 +25,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { StatCard } from '@/components/StatCard';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { listBookingsForVendorOwner } from '@/lib/bookings';
+import { durationSchema, priceSchema, requiredText, sanitizeText } from '@/lib/validation';
 import { getVendorForOwner, listVendorServices, removeVendorService, upsertVendorService } from '@/lib/vendor-admin';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Service, ServiceCategory } from '@/types/domain';
@@ -33,11 +34,27 @@ import { Service, ServiceCategory } from '@/types/domain';
 // Schema
 // ---------------------------------------------------------------------------
 
+function numericInputSchema(
+  builder: (opts: { max: number }) => ReturnType<typeof durationSchema>,
+  max: number,
+  fallbackMessage: string,
+) {
+  return z.string().superRefine((value, ctx) => {
+    const result = builder({ max }).safeParse(value);
+    if (!result.success) {
+      ctx.addIssue({
+        code: 'custom',
+        message: result.error.issues[0]?.message ?? fallbackMessage,
+      });
+    }
+  });
+}
+
 const schema = z.object({
-  title: z.string().min(2, 'Title must be at least 2 characters'),
+  title: requiredText('Title', { min: 2, max: 60 }),
   category: z.string().min(2, 'Category is required'),
-  durationMinutes: z.string().min(1, 'Duration is required'),
-  price: z.string().min(1, 'Price is required'),
+  durationMinutes: numericInputSchema(durationSchema, 1440, 'Enter a valid duration'),
+  price: numericInputSchema(priceSchema, 100000, 'Enter a valid price'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -207,8 +224,9 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
                 label="Service name"
                 required
                 value={f.value}
-                onChangeText={f.onChange}
+                onChangeText={(text) => f.onChange(sanitizeText(text, 60))}
                 placeholder="e.g. Full Synthetic Oil Change"
+                maxLength={60}
                 errorText={errors.title?.message}
               />
             )}
@@ -246,6 +264,7 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
                 onChangeText={f.onChange}
                 placeholder="45"
                 keyboardType="number-pad"
+                maxLength={4}
                 errorText={errors.durationMinutes?.message}
               />
             )}
@@ -262,6 +281,7 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
                 onChangeText={f.onChange}
                 placeholder="95"
                 keyboardType="decimal-pad"
+                maxLength={8}
                 errorText={errors.price?.message}
               />
             )}
@@ -746,9 +766,10 @@ export default function VendorServicesScreen() {
               placeholder="Search services"
               placeholderTextColor={colors.textTertiary}
               value={searchQuery}
-              onChangeText={setSearchQuery}
+              onChangeText={(text) => setSearchQuery(sanitizeText(text, 80))}
               returnKeyType="search"
               autoCorrect={false}
+              maxLength={80}
             />
           </View>
           <Pressable

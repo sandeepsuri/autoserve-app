@@ -10,6 +10,7 @@ import { OnboardingStepShell } from '@/components/onboarding/OnboardingStepShell
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import { saveVendorOnboardingDraft } from '@/lib/vendor-onboarding';
+import { clampLength } from '@/lib/validation';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 import { VendorLocationMode } from '@/types/domain';
 
@@ -166,12 +167,13 @@ export default function LocationStep() {
           required
           value={address}
           onChangeText={(text) => {
-            patchDraft({ location: { address: text } });
+            patchDraft({ location: { address: clampLength(text.replace(/[<>]/g, ''), 120) } });
             setGeocodeError(null);
           }}
           onBlur={handleAddressBlur}
           placeholder="e.g. 1234 Main St, Los Angeles, CA 90001"
           helperText="Customers will see this on your shop page."
+          maxLength={120}
           errorText={geocodeError ?? undefined}
         />
         <AppButton

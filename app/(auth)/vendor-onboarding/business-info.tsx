@@ -8,24 +8,23 @@ import { AppTextField } from '@/components/AppTextField';
 import { OnboardingStepShell } from '@/components/onboarding/OnboardingStepShell';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, spacing, typography } from '@/constants/theme';
+import { digitsOnly, emailSchema, nameSchema, requiredText, sanitizeText, urlSchema } from '@/lib/validation';
 import { saveVendorOnboardingDraft } from '@/lib/vendor-onboarding';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 
 const schema = z.object({
-  businessName: z.string().trim().min(2, 'Required'),
-  contactName: z.string().trim().min(2, 'Required'),
-  contactEmail: z.string().trim().email('Enter a valid email'),
-  contactPhone: z.string().trim().min(7, 'Required'),
-  description: z.string().trim().min(10, 'A short bio helps clients choose you'),
-  website: z
+  businessName: nameSchema('Business name', { max: 60 }),
+  contactName: nameSchema('Contact name', { max: 60 }),
+  contactEmail: emailSchema,
+  contactPhone: z
     .string()
     .trim()
-    .optional()
-    .refine((v) => !v || v.length === 0 || /^(https?:\/\/)?[\w-]+(\.[\w-]+)+/.test(v), {
-      message: 'Enter a valid URL',
-    }),
-  socialHandle: z.string().trim().optional(),
+    .transform((value) => digitsOnly(value))
+    .refine((value) => value.length === 10, { message: 'Enter a valid 10-digit phone number' }),
+  description: requiredText('Business bio', { min: 10, max: 500 }),
+  website: urlSchema,
+  socialHandle: z.string().trim().max(60, 'Social handle must be 60 characters or fewer').optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -79,6 +78,7 @@ export default function BusinessInfoStep() {
                 patchDraft({ profile: { businessName: text } });
               }}
               placeholder="e.g. Suri Auto & Tire"
+              maxLength={60}
               errorText={errors.businessName?.message}
             />
           )}
@@ -98,6 +98,7 @@ export default function BusinessInfoStep() {
               }}
               placeholder="Describe your specialties, experience, and what sets you apart…"
               helperText="Minimum 10 characters"
+              maxLength={500}
               errorText={errors.description?.message}
             />
           )}
@@ -119,6 +120,7 @@ export default function BusinessInfoStep() {
                 patchDraft({ profile: { contactName: text } });
               }}
               placeholder="Your name or point-of-contact name"
+              maxLength={60}
               errorText={errors.contactName?.message}
             />
           )}
@@ -138,6 +140,7 @@ export default function BusinessInfoStep() {
               placeholder="bookings@yourbusiness.com"
               keyboardType="email-address"
               autoCapitalize="none"
+              maxLength={120}
               errorText={errors.contactEmail?.message}
             />
           )}
@@ -151,11 +154,13 @@ export default function BusinessInfoStep() {
               required
               value={field.value}
               onChangeText={(text) => {
-                field.onChange(text);
-                patchDraft({ profile: { contactPhone: text } });
+                const digits = digitsOnly(text);
+                field.onChange(digits);
+                patchDraft({ profile: { contactPhone: digits } });
               }}
               placeholder="(555) 000-0000"
               keyboardType="phone-pad"
+              maxLength={10}
               errorText={errors.contactPhone?.message}
             />
           )}
@@ -178,6 +183,7 @@ export default function BusinessInfoStep() {
               placeholder="yourbusiness.com"
               keyboardType="url"
               autoCapitalize="none"
+              maxLength={200}
               errorText={errors.website?.message}
             />
           )}
@@ -190,11 +196,14 @@ export default function BusinessInfoStep() {
               label="Social handle"
               value={field.value ?? ''}
               onChangeText={(text) => {
-                field.onChange(text);
-                patchDraft({ profile: { socialHandle: text } });
+                const sanitized = sanitizeText(text, 60);
+                field.onChange(sanitized);
+                patchDraft({ profile: { socialHandle: sanitized } });
               }}
               placeholder="@yourbusiness"
               autoCapitalize="none"
+              maxLength={60}
+              errorText={errors.socialHandle?.message}
             />
           )}
         />

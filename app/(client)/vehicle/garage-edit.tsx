@@ -12,6 +12,7 @@ import { SearchablePicker } from '@/components/SearchablePicker';
 import { colors } from '@/constants/theme';
 import { listVehicleMakes, listVehicleModels, listVehicleYears } from '@/lib/vehicle-catalog';
 import { getVehicleById, updateVehicle } from '@/lib/vehicles';
+import { clampLength } from '@/lib/validation';
 
 interface FormErrors {
   make?: string;
@@ -232,23 +233,26 @@ export default function GarageEditScreen() {
         <AppTextField
           label="Nickname"
           value={nickname}
-          onChangeText={setNickname}
+          onChangeText={(text) => setNickname(clampLength(text.replace(/[<>]/g, ''), 40))}
           placeholder="e.g. Daily driver (optional)"
           autoCapitalize="words"
+          maxLength={40}
         />
         <AppTextField
           label="Color"
           value={color}
-          onChangeText={setColor}
+          onChangeText={(text) => setColor(clampLength(text.replace(/[<>]/g, ''), 30))}
           placeholder="e.g. Midnight Blue (optional)"
           autoCapitalize="words"
+          maxLength={30}
         />
         <AppTextField
           label="License plate"
           value={plate}
-          onChangeText={setPlate}
+          onChangeText={(text) => setPlate(clampLength(text.replace(/[<>]/g, ''), 12))}
           placeholder="e.g. ABC 1234 (optional)"
           autoCapitalize="characters"
+          maxLength={12}
         />
       </View>
 

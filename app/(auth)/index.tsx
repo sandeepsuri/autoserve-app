@@ -10,12 +10,18 @@ import { AppButton } from '@/components/AppButton';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
 import { signIn, signInWithGoogle, signUp } from '@/lib/auth';
+import { emailSchema, sanitizeName } from '@/lib/validation';
 import { useAuthStore } from '@/store/useAuthStore';
 
 const schema = z.object({
-  fullName: z.string().optional(),
-  email: z.string().email(),
-  password: z.string().min(6),
+  fullName: z
+    .string()
+    .trim()
+    .max(60, 'Name must be 60 characters or fewer')
+    .refine((value) => !/[<>]/.test(value), { message: 'Name contains invalid characters' })
+    .optional(),
+  email: emailSchema,
+  password: z.string().min(6, 'Password must be at least 6 characters').max(72, 'Password must be 72 characters or fewer'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -29,7 +35,8 @@ export default function AuthScreen() {
   const setGuestMode = useAuthStore((state) => state.setGuestMode);
   const setPostAuthPath = useAuthStore((state) => state.setPostAuthPath);
 
-  const { control, handleSubmit, formState: { isSubmitting } } = useForm<FormValues>({
+  const { control, handleSubmit, formState: { isSubmitting, errors } } = useForm<FormValues>({
+    mode: 'onChange',
     defaultValues: {
       fullName: '',
       email: '',
@@ -58,12 +65,14 @@ export default function AuthScreen() {
   };
 
   const onSubmit = handleSubmit(async (values) => {
+    const email = values.email.trim().toLowerCase();
+    const fullName = values.fullName ? sanitizeName(values.fullName) : '';
     try {
       if (mode === 'login') {
-        await signIn(values.email, values.password);
+        await signIn(email, values.password);
         handleSuccess();
       } else {
-        const result = await signUp(values.email, values.password, values.fullName || 'AutoServe User');
+        const result = await signUp(email, values.password, fullName || 'AutoServe User');
         if (result.needsConfirmation) {
           setConfirmationPending(true);
         } else {
@@ -94,13 +103,17 @@ export default function AuthScreen() {
           control={control}
           name="fullName"
           render={({ field: { onChange, value } }) => (
-            <TextInput
-              style={styles.input}
-              placeholder="Full name"
-              placeholderTextColor={colors.textTertiary}
-              value={value}
-              onChangeText={onChange}
-            />
+            <View>
+              <TextInput
+                style={styles.input}
+                placeholder="Full name"
+                placeholderTextColor={colors.textTertiary}
+                value={value}
+                onChangeText={onChange}
+                maxLength={60}
+              />
+              {errors.fullName?.message ? <Text style={styles.fieldError}>{errors.fullName.message}</Text> : null}
+            </View>
           )}
         />
       ) : null}
@@ -109,15 +122,19 @@ export default function AuthScreen() {
         control={control}
         name="email"
         render={({ field: { onChange, value } }) => (
-          <TextInput
-            autoCapitalize="none"
-            keyboardType="email-address"
-            style={styles.input}
-            placeholder="Email address"
-            placeholderTextColor={colors.textTertiary}
-            value={value}
-            onChangeText={onChange}
-          />
+          <View>
+            <TextInput
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={styles.input}
+              placeholder="Email address"
+              placeholderTextColor={colors.textTertiary}
+              value={value}
+              onChangeText={onChange}
+              maxLength={120}
+            />
+            {errors.email?.message ? <Text style={styles.fieldError}>{errors.email.message}</Text> : null}
+          </View>
         )}
       />
 
@@ -125,14 +142,18 @@ export default function AuthScreen() {
         control={control}
         name="password"
         render={({ field: { onChange, value } }) => (
-          <TextInput
-            secureTextEntry
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor={colors.textTertiary}
-            value={value}
-            onChangeText={onChange}
-          />
+          <View>
+            <TextInput
+              secureTextEntry
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={colors.textTertiary}
+              value={value}
+              onChangeText={onChange}
+              maxLength={72}
+            />
+            {errors.password?.message ? <Text style={styles.fieldError}>{errors.password.message}</Text> : null}
+          </View>
         )}
       />
 
@@ -187,6 +208,11 @@ const styles = StyleSheet.create({
     ...typography.bodyMd,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  fieldError: {
+    ...typography.caption,
+    color: colors.danger,
+    marginTop: spacing.xs,
   },
   input: {
     backgroundColor: colors.bgElevated,

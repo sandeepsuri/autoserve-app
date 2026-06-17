@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { clampLength } from '@/lib/validation';
 import { listVehicles } from '@/lib/vehicles';
 import { getVendorDetail } from '@/lib/vendors';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -131,10 +132,11 @@ export default function BookingDetailsScreen() {
         <AppTextField
           label="Issue details"
           value={draft.notes ?? ''}
-          onChangeText={(text) => updateDraft({ notes: text })}
+          onChangeText={(text) => updateDraft({ notes: clampLength(text.replace(/[<>]/g, ''), 500) })}
           placeholder="Brake squeal at low speed, engine light on, vibration at highway speeds…"
           multiline
           helperText="This note is shared with the vendor before they accept the booking."
+          maxLength={500}
         />
       </AppCard>
 
