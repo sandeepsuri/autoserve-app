@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -28,6 +28,106 @@ import { useVendorAvailabilityStore } from '@/store/useVendorAvailabilityStore';
 import { BookingRecord } from '@/types/domain';
 
 type StatusTab = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+type PrimaryView = 'queue' | 'schedule';
+type ScheduleRange = 'day' | 'week' | 'month';
+
+type ScheduledBooking = {
+  booking: BookingRecord;
+  startsAt: Date;
+  dateKey: string;
+};
+
+function pad2(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function startOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function addMonths(date: Date, months: number) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months, 1);
+  return next;
+}
+
+function parseAppointmentStart(booking: BookingRecord): Date | null {
+  if (booking.appointmentDate && booking.appointmentTime) {
+    const date = new Date(`${booking.appointmentDate}T${booking.appointmentTime}:00`);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+
+  const fallback = new Date(booking.scheduledAt);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function getScheduledBookings(bookings: BookingRecord[]): ScheduledBooking[] {
+  return bookings
+    .map((booking) => {
+      const startsAt = parseAppointmentStart(booking);
+      return startsAt ? { booking, startsAt, dateKey: toDateKey(startsAt) } : null;
+    })
+    .filter((entry): entry is ScheduledBooking => Boolean(entry))
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+}
+
+function formatDayHeading(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  }).format(date);
+}
+
+function formatShortDay(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    day: 'numeric',
+  }).format(date);
+}
+
+function formatMonthHeading(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+}
+
+function formatAppointmentTime(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function serviceSummary(booking: BookingRecord) {
+  return booking.services.length ? booking.services.map((service) => service.title).join(' · ') : 'Service request';
+}
+
+function statusAccent(status: BookingRecord['status']) {
+  if (status === 'pending') return colors.surfaceAccent;
+  if (status === 'confirmed') return colors.surfaceBrand;
+  if (status === 'completed') return colors.surfaceSuccess;
+  return colors.textTertiary;
+}
+
+function weekStartFor(date: Date) {
+  const day = startOfDay(date);
+  const mondayOffset = (day.getDay() + 6) % 7;
+  return addDays(day, -mondayOffset);
+}
 
 // Derive initials from a display name, fallback to 'CL'
 function getInitials(name?: string): string {
@@ -60,7 +160,10 @@ const SECTION_LABELS: Record<StatusTab, string> = {
 export default function VendorBookingsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [primaryView, setPrimaryView] = useState<PrimaryView>('queue');
   const [tab, setTab] = useState<StatusTab>('pending');
+  const [scheduleRange, setScheduleRange] = useState<ScheduleRange>('day');
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const userId = useAuthStore((s) => s.session?.userId ?? 'anon');
 
@@ -91,7 +194,33 @@ export default function VendorBookingsScreen() {
     }
   }, [vendorAvailability, setAvailability]);
 
-  const filtered = bookings.filter((b) => b.status === tab);
+  const filtered = useMemo(
+    () =>
+      bookings
+        .filter((b) => b.status === tab)
+        .sort((a, b) => {
+          const left = parseAppointmentStart(a)?.getTime() ?? new Date(a.createdAt).getTime();
+          const right = parseAppointmentStart(b)?.getTime() ?? new Date(b.createdAt).getTime();
+          return left - right;
+        }),
+    [bookings, tab],
+  );
+
+  const scheduledBookings = useMemo(() => getScheduledBookings(bookings), [bookings]);
+  const selectedDateKey = toDateKey(selectedDate);
+  const dayAppointments = scheduledBookings.filter((entry) => entry.dateKey === selectedDateKey);
+  const weekStart = weekStartFor(selectedDate);
+  const weekDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  const monthDays = Array.from(
+    { length: new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate() },
+    (_, index) => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), index + 1),
+  );
+  const visibleScheduleCount =
+    scheduleRange === 'day'
+      ? dayAppointments.length
+      : scheduleRange === 'week'
+      ? weekDays.reduce((sum, date) => sum + scheduledBookings.filter((entry) => entry.dateKey === toDateKey(date)).length, 0)
+      : monthDays.reduce((sum, date) => sum + scheduledBookings.filter((entry) => entry.dateKey === toDateKey(date)).length, 0);
 
   // Live counts per status
   const countOf = (s: StatusTab) => bookings.filter((b) => b.status === s).length;
@@ -102,6 +231,18 @@ export default function VendorBookingsScreen() {
   const expectedEarnings = bookings
     .filter((b) => b.status === 'pending' || b.status === 'confirmed')
     .reduce((sum, b) => sum + (b.total ?? 0), 0);
+
+  const moveScheduleWindow = (direction: -1 | 1) => {
+    if (scheduleRange === 'day') {
+      setSelectedDate((current) => addDays(current, direction));
+      return;
+    }
+    if (scheduleRange === 'week') {
+      setSelectedDate((current) => addDays(current, direction * 7));
+      return;
+    }
+    setSelectedDate((current) => addMonths(current, direction));
+  };
 
   const invalidateAll = (bookingId: string) =>
     Promise.all([
@@ -169,6 +310,27 @@ export default function VendorBookingsScreen() {
         </View>
       </View>
 
+      <View style={styles.primaryToggle} accessibilityRole="tablist">
+        {(['queue', 'schedule'] as PrimaryView[]).map((view) => {
+          const active = primaryView === view;
+          return (
+            <Pressable
+              key={view}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              onPress={() => setPrimaryView(view)}
+              style={[styles.primaryToggleItem, active && styles.primaryToggleItemActive]}
+            >
+              <Text style={[styles.primaryToggleText, active && styles.primaryToggleTextActive]}>
+                {view === 'queue' ? 'Queue' : 'Schedule'}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {primaryView === 'queue' ? (
+        <>
       {/* Status filter chips — horizontal scroll */}
       <ScrollView
         horizontal
@@ -375,6 +537,210 @@ export default function VendorBookingsScreen() {
             </Pressable>
           );
         })}
+        </>
+      ) : (
+        <>
+          <View style={[styles.scheduleSummary, shadows.floating]}>
+            <View style={styles.scheduleSummaryTop}>
+              <View style={styles.scheduleTitleBlock}>
+                <Text style={styles.scheduleTitle}>
+                  {scheduleRange === 'month' ? formatMonthHeading(selectedDate) : formatDayHeading(selectedDate)}
+                </Text>
+                <Text style={styles.scheduleSubtitle}>
+                  {visibleScheduleCount} {visibleScheduleCount === 1 ? 'appointment' : 'appointments'} in view
+                </Text>
+              </View>
+              <View style={styles.dateNav}>
+                <Pressable
+                  onPress={() => moveScheduleWindow(-1)}
+                  accessibilityLabel={`Previous ${scheduleRange}`}
+                  style={styles.dateNavButton}
+                >
+                  <Text style={styles.dateNavText}>‹</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setSelectedDate(startOfDay(new Date()))}
+                  accessibilityLabel="Go to today"
+                  style={styles.todayButton}
+                >
+                  <Text style={styles.todayButtonText}>Today</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => moveScheduleWindow(1)}
+                  accessibilityLabel={`Next ${scheduleRange}`}
+                  style={styles.dateNavButton}
+                >
+                  <Text style={styles.dateNavText}>›</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.rangeToggle} accessibilityRole="tablist">
+              {(['day', 'week', 'month'] as ScheduleRange[]).map((range) => {
+                const active = scheduleRange === range;
+                return (
+                  <Pressable
+                    key={range}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: active }}
+                    onPress={() => setScheduleRange(range)}
+                    style={[styles.rangeToggleItem, active && styles.rangeToggleItemActive]}
+                  >
+                    <Text style={[styles.rangeToggleText, active && styles.rangeToggleTextActive]}>
+                      {range[0].toUpperCase() + range.slice(1)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {isLoading && (
+            <AppCard style={styles.loadingCard}>
+              <Text style={styles.loadingText}>Loading schedule...</Text>
+            </AppCard>
+          )}
+
+          {!isLoading && error ? (
+            <EmptyState
+              title="Could not load schedule"
+              body={error instanceof Error ? error.message : 'Please try again after refreshing the screen.'}
+            />
+          ) : null}
+
+          {!isLoading && !error && scheduleRange === 'day' ? (
+            dayAppointments.length ? (
+              <View style={styles.timeline}>
+                {dayAppointments.map(({ booking, startsAt }) => {
+                  const pill = STATUS_COLORS[booking.status];
+                  const isMobile = booking.bookingMode === 'mobile';
+                  return (
+                    <Pressable
+                      key={booking.id}
+                      onPress={() => router.push(`/(vendor)/booking-detail/${booking.id}`)}
+                      accessibilityLabel={`${formatAppointmentTime(startsAt)}, ${booking.clientName ?? 'Client'}, ${serviceSummary(booking)}, ${STATUS_LABEL[booking.status]}`}
+                      style={styles.timelineRow}
+                    >
+                      <View style={styles.timelineTime}>
+                        <Text style={styles.timelineTimeText}>{formatAppointmentTime(startsAt)}</Text>
+                      </View>
+                      <View style={[styles.appointmentBlock, { borderLeftColor: statusAccent(booking.status) }]}>
+                        <View style={styles.appointmentTop}>
+                          <View style={styles.appointmentCopy}>
+                            <Text style={styles.appointmentCustomer} numberOfLines={1}>
+                              {booking.clientName ?? 'Client'}
+                            </Text>
+                            <Text style={styles.appointmentService} numberOfLines={2}>
+                              {serviceSummary(booking)}
+                            </Text>
+                          </View>
+                          <View style={[styles.statusPill, { backgroundColor: pill.bg }]}>
+                            <Text style={[styles.statusPillText, { color: pill.fg }]}>
+                              {STATUS_LABEL[booking.status]}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.appointmentMetaRow}>
+                          <Text style={styles.appointmentMeta} numberOfLines={1}>
+                            {booking.vehicleLabel ?? 'Vehicle pending'}
+                          </Text>
+                          <Text style={styles.appointmentMeta}>
+                            {isMobile ? 'Mobile service' : 'At the shop'}
+                          </Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <EmptyState
+                title="No appointments this day"
+                body="Confirmed and pending appointments for the selected day will appear here by time."
+              />
+            )
+          ) : null}
+
+          {!isLoading && !error && scheduleRange === 'week' ? (
+            <View style={styles.weekGrid}>
+              {weekDays.map((date) => {
+                const key = toDateKey(date);
+                const dayItems = scheduledBookings.filter((entry) => entry.dateKey === key);
+                const pending = dayItems.filter((entry) => entry.booking.status === 'pending').length;
+                const active = key === selectedDateKey;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => {
+                      setSelectedDate(date);
+                      setScheduleRange('day');
+                    }}
+                    style={[styles.weekDay, active && styles.weekDayActive]}
+                  >
+                    <Text style={[styles.weekDayLabel, active && styles.weekDayLabelActive]}>
+                      {formatShortDay(date)}
+                    </Text>
+                    <Text style={[styles.weekDayCount, active && styles.weekDayCountActive]}>
+                      {dayItems.length}
+                    </Text>
+                    <Text style={[styles.weekDayMeta, active && styles.weekDayMetaActive]} numberOfLines={1}>
+                      {dayItems.length === 1 ? 'job' : 'jobs'}
+                    </Text>
+                    {pending ? (
+                      <Text style={[styles.weekDayPending, active && styles.weekDayPendingActive]} numberOfLines={1}>
+                        {pending} pend.
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+
+          {!isLoading && !error && scheduleRange === 'month' ? (
+            <View style={styles.monthGrid}>
+              {monthDays.map((date) => {
+                const key = toDateKey(date);
+                const dayItems = scheduledBookings.filter((entry) => entry.dateKey === key);
+                const pending = dayItems.filter((entry) => entry.booking.status === 'pending').length;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => {
+                      setSelectedDate(date);
+                      setScheduleRange('day');
+                    }}
+                    style={styles.monthDay}
+                  >
+                    <Text style={styles.monthDayNumber}>{date.getDate()}</Text>
+                    {dayItems.length ? (
+                      <View style={styles.monthDensity}>
+                        <Text style={styles.monthDensityText} numberOfLines={1}>
+                          {dayItems.length} {dayItems.length === 1 ? 'job' : 'jobs'}
+                        </Text>
+                        {pending ? (
+                          <Text style={styles.monthPendingText} numberOfLines={1}>
+                            {pending} pending
+                          </Text>
+                        ) : null}
+                      </View>
+                    ) : (
+                      <Text style={styles.monthEmpty}>-</Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+
+          {!isLoading && !error && scheduleRange !== 'day' && visibleScheduleCount === 0 ? (
+            <EmptyState
+              title={`No appointments this ${scheduleRange}`}
+              body="Schedule density will appear here as bookings are created or confirmed."
+            />
+          ) : null}
+        </>
+      )}
 
       {/* Bottom action area */}
       <View style={styles.bottomActions}>
@@ -480,6 +846,295 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 14,
     color: '#CBD5E1',
+  },
+  primaryToggle: {
+    minHeight: 48,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgElevated,
+    padding: 4,
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  primaryToggleItem: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  primaryToggleItemActive: {
+    backgroundColor: colors.bgStrong,
+  },
+  primaryToggleText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+    lineHeight: 17,
+    color: colors.textSecondary,
+  },
+  primaryToggleTextActive: {
+    color: colors.textInverse,
+  },
+  scheduleSummary: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgElevated,
+    padding: spacing.lg,
+    gap: spacing.lg,
+  },
+  scheduleSummaryTop: {
+    gap: spacing.md,
+  },
+  scheduleTitleBlock: {
+    gap: spacing.xs,
+  },
+  scheduleTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 20,
+    lineHeight: 24,
+    color: colors.textPrimary,
+  },
+  scheduleSubtitle: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary,
+  },
+  dateNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  dateNavButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgBase,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateNavText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 24,
+    lineHeight: 28,
+    color: colors.textPrimary,
+  },
+  todayButton: {
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgBase,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  todayButtonText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+    lineHeight: 17,
+    color: colors.textPrimary,
+  },
+  rangeToggle: {
+    minHeight: 44,
+    borderRadius: radius.full,
+    backgroundColor: colors.bgBase,
+    padding: 4,
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  rangeToggleItem: {
+    flex: 1,
+    minHeight: 36,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  rangeToggleItemActive: {
+    backgroundColor: colors.bgStrong,
+  },
+  rangeToggleText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
+  rangeToggleTextActive: {
+    color: colors.textInverse,
+  },
+  timeline: {
+    gap: spacing.md,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  timelineTime: {
+    width: 70,
+    paddingTop: spacing.md,
+    flexShrink: 0,
+  },
+  timelineTimeText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+    lineHeight: 17,
+    color: colors.textPrimary,
+  },
+  appointmentBlock: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgElevated,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  appointmentTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  appointmentCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: spacing.xs,
+  },
+  appointmentCustomer: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 15,
+    lineHeight: 19,
+    color: colors.textPrimary,
+  },
+  appointmentService: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    lineHeight: 17,
+    color: colors.textSecondary,
+  },
+  appointmentMetaRow: {
+    gap: spacing.xs,
+  },
+  appointmentMeta: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
+  weekGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  weekDay: {
+    flexBasis: '30%',
+    flexGrow: 1,
+    minWidth: 96,
+    minHeight: 112,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgElevated,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  weekDayActive: {
+    backgroundColor: colors.bgStrong,
+    borderColor: colors.bgStrong,
+  },
+  weekDayLabel: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.textSecondary,
+  },
+  weekDayLabelActive: {
+    color: colors.textInverse,
+  },
+  weekDayCount: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 28,
+    lineHeight: 32,
+    color: colors.textPrimary,
+  },
+  weekDayCountActive: {
+    color: colors.textInverse,
+  },
+  weekDayMeta: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12,
+    lineHeight: 15,
+    color: colors.textSecondary,
+  },
+  weekDayMetaActive: {
+    color: '#CBD5E1',
+  },
+  weekDayPending: {
+    alignSelf: 'flex-start',
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceSubtleOrange,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10,
+    lineHeight: 13,
+    color: colors.pending,
+  },
+  weekDayPendingActive: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    color: colors.textInverse,
+  },
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  monthDay: {
+    flexBasis: '21%',
+    flexGrow: 1,
+    minWidth: 72,
+    minHeight: 92,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgElevated,
+    padding: spacing.sm,
+    gap: spacing.xs,
+  },
+  monthDayNumber: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+    lineHeight: 17,
+    color: colors.textPrimary,
+  },
+  monthDensity: {
+    gap: 2,
+  },
+  monthDensityText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    lineHeight: 14,
+    color: colors.surfaceBrand,
+  },
+  monthPendingText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10,
+    lineHeight: 13,
+    color: colors.pending,
+  },
+  monthEmpty: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12,
+    lineHeight: 15,
+    color: colors.textTertiary,
   },
 
   // Filters
