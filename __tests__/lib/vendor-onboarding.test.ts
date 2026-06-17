@@ -73,6 +73,7 @@ const demoState = {
       demoState.onboardingDrafts.push(draft);
     }
   }),
+  saveVendorAvailability: jest.fn(),
 };
 
 beforeEach(() => {

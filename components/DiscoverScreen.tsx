@@ -12,6 +12,7 @@ import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { VendorCard } from '@/components/VendorCard';
 import { colors, spacing, typography } from '@/constants/theme';
+import { sanitizeText } from '@/lib/validation';
 import { listVendors } from '@/lib/vendors';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -77,10 +78,11 @@ export function DiscoverScreen({ shopRoute = '/(public)/shop' }: Props) {
 
       <TextInput
         value={query}
-        onChangeText={setQuery}
+        onChangeText={(text) => setQuery(sanitizeText(text, 80))}
         placeholder="Search shops, services, or mobile mechanics"
         placeholderTextColor={colors.textTertiary}
         style={styles.search}
+        maxLength={80}
       />
 
       <View style={styles.inline}>

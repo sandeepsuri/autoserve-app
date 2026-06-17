@@ -10,6 +10,7 @@ import { LocationPinMap } from '@/components/LocationPinMap';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, spacing, typography } from '@/constants/theme';
+import { clampLength } from '@/lib/validation';
 import { getVendorForOwner, updateVendorLocation } from '@/lib/vendor-admin';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -68,12 +69,13 @@ export default function VendorLocationScreen() {
           required
           value={address}
           onChangeText={(text) => {
-            setAddress(text);
+            setAddress(clampLength(text.replace(/[<>]/g, ''), 120));
             setGeocodeError(null);
           }}
           onBlur={handleAddressBlur}
           placeholder="e.g. 1234 Main St, Los Angeles, CA 90001"
           helperText="Type an address and the pin will update automatically."
+          maxLength={120}
           errorText={geocodeError ?? undefined}
         />
       </AppCard>
@@ -105,7 +107,7 @@ export default function VendorLocationScreen() {
         <Text style={styles.radius}>{radius} miles</Text>
         <View style={styles.actions}>
           <AppButton label="- 5" variant="secondary" style={styles.actionButton} onPress={() => setRadius((v) => Math.max(5, v - 5))} />
-          <AppButton label="+ 5" variant="secondary" style={styles.actionButton} onPress={() => setRadius((v) => v + 5)} />
+          <AppButton label="+ 5" variant="secondary" style={styles.actionButton} onPress={() => setRadius((v) => Math.min(100, v + 5))} />
         </View>
       </AppCard>
 
