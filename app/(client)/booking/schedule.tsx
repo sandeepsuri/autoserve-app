@@ -1,9 +1,10 @@
 /**
  * Ticket 5 — Client booking schedule (availability-aware)
  *
- * Replaces static date/time chips with availability-derived states:
- *   - Date chips: open / closed (disabled/hidden) / fully-booked (unavailable)
- *   - Time chips: derived from vendor availability model (slot length + mode)
+ * Replaces static date/time chips with availability-derived scheduling:
+ *   - Full-width service rows with readable metadata
+ *   - 90-day monthly calendar with open / limited / closed / fully-booked states
+ *   - Time grid derived from vendor availability model after date selection
  *   - No-slots empty state with "next available" CTA
  *   - Stale slot cleared if selected date/time becomes invalid after refresh
  *   - Draft/back behavior preserved
@@ -16,8 +17,9 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -26,8 +28,7 @@ import { BookingSummaryCard } from '@/components/BookingSummaryCard';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
-import { ServiceCard } from '@/components/ServiceCard';
-import { colors, radius, spacing, typography } from '@/constants/theme';
+import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { createBookingFromSelections } from '@/lib/bookings';
 import { ensureProfileRow } from '@/lib/auth';
 import { queryClient } from '@/lib/query-client';
@@ -41,28 +42,103 @@ import {
   isDateFullyBooked,
   useVendorAvailabilityStore,
 } from '@/store/useVendorAvailabilityStore';
+import { Service } from '@/types/domain';
 
-/** Number of future days to show in the date picker */
-const DATE_WINDOW = 14;
+/** Number of future days available to book */
+const DATE_WINDOW = 90;
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const FOOTER_SPACE = 168;
 
-function getUpcomingDateOptions(): { value: string; label: string }[] {
-  const formatter = new Intl.DateTimeFormat('en-US', {
+type DateState = {
+  value: string;
+  day: number;
+  label: string;
+  monthLabel: string;
+  isToday: boolean;
+  isInDisplayedMonth: boolean;
+  isOutOfWindow: boolean;
+  isClosed: boolean;
+  isFullyBooked: boolean;
+  isLimited: boolean;
+  hasSlots: boolean;
+};
+
+function startOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function addMonths(date: Date, months: number) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months, 1);
+  return startOfDay(next);
+}
+
+function toDateIso(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function fromDateIso(dateIso: string) {
+  return startOfDay(new Date(`${dateIso}T00:00:00`));
+}
+
+function sameMonth(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+function monthKey(date: Date) {
+  return date.getFullYear() * 12 + date.getMonth();
+}
+
+function formatMonthYear(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+}
+
+function formatWindowDate(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
+}
+
+function formatFullDate(dateIso: string) {
+  return new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
-  });
+  }).format(fromDateIso(dateIso));
+}
+
+function getUpcomingDateOptions(): { value: string; label: string; monthLabel: string }[] {
+  const today = startOfDay(new Date());
   return Array.from({ length: DATE_WINDOW }, (_, index) => {
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
+    const date = new Date(today);
     date.setDate(date.getDate() + index + 1);
-    const iso = date.toISOString().slice(0, 10);
-    const label = index === 0 ? 'Tomorrow' : formatter.format(date);
-    return { value: iso, label };
+    const iso = toDateIso(date);
+    return {
+      value: iso,
+      label: index === 0 ? 'Tomorrow' : formatFullDate(iso),
+      monthLabel: formatMonthYear(date),
+    };
   });
 }
 
 export default function BookingScheduleScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { draft, clearDraft, updateDraft } = useBookingDraftStore();
   const { session, profile, guestMode, guestClientId, setPostAuthPath } = useAuthStore();
   const { availability } = useVendorAvailabilityStore();
@@ -93,36 +169,92 @@ export default function BookingScheduleScreen() {
   const serviceFee = Math.round(subtotal * 0.12 * 100) / 100;
   const total = Math.round((subtotal + serviceFee) * 100) / 100;
 
+  const selectedDateForInitialMonth = draft.scheduledDate
+    ? fromDateIso(draft.scheduledDate)
+    : addDays(startOfDay(new Date()), 1);
+  const [visibleMonth, setVisibleMonth] = useState(() =>
+    startOfDay(new Date(selectedDateForInitialMonth.getFullYear(), selectedDateForInitialMonth.getMonth(), 1)),
+  );
+
   const savedVehicle = vehicles.find((v) => v.id === draft.vehicleId);
+  const hasSelectedVehicle = Boolean(draft.vehicleId);
   const vehicleLabel = savedVehicle
     ? savedVehicle.nickname
       ? `${savedVehicle.nickname} (${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model})`
       : `${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model}`
-    : null;
+    : draft.vehicleId
+      ? 'Selected vehicle'
+      : null;
 
   // --- Availability-aware date options ---
   const allDateOptions = useMemo(() => getUpcomingDateOptions(), []);
+  const bookingStart = useMemo(() => addDays(startOfDay(new Date()), 1), []);
+  const bookingEnd = useMemo(() => addDays(startOfDay(new Date()), DATE_WINDOW), []);
+  const bookingWindowLabel = `${formatWindowDate(bookingStart)}-${formatWindowDate(bookingEnd)}`;
 
   // For each date: derive state from vendor availability
   const dateStates = useMemo(() => {
     return allDateOptions.map((opt) => {
       const fullyBooked = isDateFullyBooked(opt.value, vendorAvailability);
       const slots = deriveAvailableSlots(opt.value, vendorAvailability);
+      const maxPossibleSlots = deriveAvailableSlots(opt.value, {
+        ...vendorAvailability,
+        capacityPerSlot: 999,
+      });
       const isClosed = slots.length === 0 && !fullyBooked;
       return {
         ...opt,
+        day: fromDateIso(opt.value).getDate(),
+        isToday: opt.value === toDateIso(startOfDay(new Date())),
+        isInDisplayedMonth: true,
+        isOutOfWindow: false,
         isClosed,
         isFullyBooked: fullyBooked,
+        isLimited: slots.length > 0 && slots.length <= Math.max(1, Math.floor(maxPossibleSlots.length / 2)),
         hasSlots: slots.length > 0,
       };
     });
   }, [allDateOptions, vendorAvailability]);
 
-  // Only open dates shown to client
-  const openDates = dateStates.filter((d) => !d.isClosed);
-
   // Next available date (for "next available" CTA)
   const nextAvailableDate = dateStates.find((d) => d.hasSlots);
+
+  const dateStateByValue = useMemo(
+    () => new Map(dateStates.map((dateState) => [dateState.value, dateState])),
+    [dateStates],
+  );
+
+  const calendarDates = useMemo(() => {
+    const firstOfMonth = startOfDay(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1));
+    const firstGridDate = addDays(firstOfMonth, -firstOfMonth.getDay());
+    return Array.from({ length: 42 }, (_, index): DateState => {
+      const cellDate = addDays(firstGridDate, index);
+      const value = toDateIso(cellDate);
+      const existingState = dateStateByValue.get(value);
+      const isOutOfWindow = cellDate < bookingStart || cellDate > bookingEnd;
+      if (existingState) {
+        return {
+          ...existingState,
+          isInDisplayedMonth: sameMonth(cellDate, visibleMonth),
+          isOutOfWindow,
+        };
+      }
+
+      return {
+        value,
+        day: cellDate.getDate(),
+        label: formatFullDate(value),
+        monthLabel: formatMonthYear(cellDate),
+        isToday: value === toDateIso(startOfDay(new Date())),
+        isInDisplayedMonth: sameMonth(cellDate, visibleMonth),
+        isOutOfWindow: true,
+        isClosed: true,
+        isFullyBooked: false,
+        isLimited: false,
+        hasSlots: false,
+      };
+    });
+  }, [bookingEnd, bookingStart, dateStateByValue, visibleMonth]);
 
   // Available time slots for selected date
   const availableTimeSlots = useMemo(() => {
@@ -131,34 +263,34 @@ export default function BookingScheduleScreen() {
   }, [draft.scheduledDate, vendorAvailability]);
 
   // Stale slot guard: clear scheduledTime if selected slot no longer exists.
-  // updateDraft is stable (zustand setter).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (draft.scheduledTime && !availableTimeSlots.includes(draft.scheduledTime)) {
       updateDraft({ scheduledTime: undefined });
     }
-  }, [availableTimeSlots, draft.scheduledTime]);
+  }, [availableTimeSlots, draft.scheduledTime, updateDraft]);
 
   // Stale date guard: clear scheduledDate if it is now closed.
-  // updateDraft is stable (zustand setter).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (draft.scheduledDate) {
       const dateState = dateStates.find((d) => d.value === draft.scheduledDate);
-      if (dateState && !dateState.hasSlots) {
+      if (!dateState || !dateState.hasSlots) {
         updateDraft({ scheduledDate: undefined, scheduledTime: undefined });
       }
     }
-  }, [dateStates, draft.scheduledDate]);
+  }, [dateStates, draft.scheduledDate, updateDraft]);
 
   const selectedDateLabel =
-    openDates.find((o) => o.value === draft.scheduledDate)?.label ??
+    dateStates.find((o) => o.value === draft.scheduledDate)?.label ??
     draft.scheduledDate ??
     'Choose a date';
 
+  const selectedTimeLabel = draft.scheduledTime ? formatTimeDisplay(draft.scheduledTime) : 'Choose a time';
+  const previousMonthDisabled = monthKey(visibleMonth) <= monthKey(bookingStart);
+  const nextMonthDisabled = monthKey(visibleMonth) >= monthKey(bookingEnd);
+
   const canConfirm = Boolean(
     draft.vendorId &&
-      savedVehicle &&
+      hasSelectedVehicle &&
       draft.bookingMode &&
       selectedServiceIds.length &&
       draft.scheduledDate &&
@@ -170,6 +302,11 @@ export default function BookingScheduleScreen() {
       ? selectedServiceIds.filter((id) => id !== serviceId)
       : [...selectedServiceIds, serviceId];
     updateDraft({ serviceIds: next, serviceId: next[0] });
+  };
+
+  const selectDate = (dateState: DateState) => {
+    if (!dateState.hasSlots || dateState.isOutOfWindow) return;
+    updateDraft({ scheduledDate: dateState.value, scheduledTime: undefined });
   };
 
   const confirmBooking = async () => {
@@ -238,259 +375,608 @@ export default function BookingScheduleScreen() {
   }
 
   return (
-    <Screen>
-      <AppHeader
-        title="2. Services, date, and time"
-        subtitle="Choose the work you need, then lock in a date and one of the vendor's available time slots."
-        fallbackHref="/(client)/booking/service"
-      />
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.fill}
+        contentContainerStyle={[styles.content, { paddingBottom: FOOTER_SPACE + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <AppHeader
+          title="2. Services, date, and time"
+          subtitle="Choose the work you need, then lock in a date and one of the vendor's available time slots."
+          fallbackHref="/(client)/booking/service"
+        />
 
-      <BookingSummaryCard
-        title="Booking request"
-        rows={[
-          { label: 'Vendor', value: vendor?.name ?? (isLoading ? 'Loading…' : 'Selected vendor') },
-          { label: 'Vehicle', value: vehicleLabel ?? 'Vehicle required' },
-          {
-            label: 'Service type',
-            value: draft.bookingMode === 'mobile' ? 'Mobile Service' : 'Shop Visit',
-          },
-          {
-            label: 'Problem',
-            value: draft.notes?.trim() ? draft.notes.trim() : 'No issue notes added',
-          },
-        ]}
-      />
+        <BookingSummaryCard
+          title="Booking request"
+          rows={[
+            { label: 'Vendor', value: vendor?.name ?? (isLoading ? 'Loading...' : 'Selected vendor') },
+            { label: 'Vehicle', value: vehicleLabel ?? 'Vehicle required' },
+            {
+              label: 'Service type',
+              value: draft.bookingMode === 'mobile' ? 'Mobile Service' : 'Shop Visit',
+            },
+            {
+              label: 'Problem',
+              value: draft.notes?.trim() ? draft.notes.trim() : 'No issue notes added',
+            },
+          ]}
+        />
 
-      <View style={styles.section}>
-        <SectionHeader title="Select services" actionLabel="Choose one or more" />
-        <View style={styles.grid}>
-          {services.map((service) => (
-            <ServiceCard
-              key={service.id}
-              service={service}
-              active={selectedServiceIds.includes(service.id)}
-              onPress={() => toggleService(service.id)}
-            />
-          ))}
-        </View>
-      </View>
-
-      {/* Availability-aware date picker */}
-      <AppCard style={styles.card}>
-        <SectionHeader title="Appointment date" />
-        {openDates.length > 0 ? (
-          <View style={styles.selectionWrap}>
-            {openDates.map((opt) => {
-              const active = draft.scheduledDate === opt.value;
-              const isLimited =
-                deriveAvailableSlots(opt.value, vendorAvailability).length <=
-                Math.floor(
-                  deriveAvailableSlots(opt.value, { ...vendorAvailability, capacityPerSlot: 999 }).length /
-                    2,
-                );
-              return (
-                <Pressable
-                  key={opt.value}
-                  onPress={() => updateDraft({ scheduledDate: opt.value, scheduledTime: undefined })}
-                  style={[
-                    styles.selectionChip,
-                    active && styles.selectionChipActive,
-                    isLimited && !active && styles.selectionChipLimited,
-                    opt.isFullyBooked && styles.selectionChipBooked,
-                  ]}
-                  disabled={opt.isFullyBooked}
-                  accessibilityState={{ selected: active, disabled: opt.isFullyBooked }}
-                  accessibilityLabel={`${opt.label}${opt.isFullyBooked ? ' — fully booked' : isLimited ? ' — limited slots' : ''}`}
-                >
-                  <Text
-                    style={[
-                      styles.selectionChipText,
-                      active && styles.selectionChipTextActive,
-                      opt.isFullyBooked && styles.selectionChipTextBooked,
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                  {isLimited && !active ? (
-                    <Text style={styles.limitedBadge}>Limited</Text>
-                  ) : null}
-                  {opt.isFullyBooked ? (
-                    <Text style={styles.bookedBadge}>Full</Text>
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : (
-          /* No-slots empty state */
-          <View style={styles.noSlotsBox}>
-            <Text style={styles.noSlotsTitle}>No availability in the next {DATE_WINDOW} days</Text>
-            <Text style={styles.noSlotsBody}>
-              This vendor has no open slots in the next two weeks. Check back later or try another vendor.
-            </Text>
-            {nextAvailableDate ? (
-              <AppButton
-                label={`Next available: ${nextAvailableDate.label}`}
-                variant="secondary"
-                onPress={() =>
-                  updateDraft({ scheduledDate: nextAvailableDate.value, scheduledTime: undefined })
-                }
-              />
-            ) : null}
-          </View>
-        )}
-      </AppCard>
-
-      {/* Availability-aware time slot picker */}
-      {draft.scheduledDate ? (
-        <AppCard style={styles.card}>
-          <SectionHeader title="Available time slots" actionLabel={selectedDateLabel} />
-          {availableTimeSlots.length > 0 ? (
-            <View style={styles.selectionWrap}>
-              {availableTimeSlots.map((slot) => {
-                const active = draft.scheduledTime === slot;
-                return (
-                  <Pressable
-                    key={slot}
-                    onPress={() => updateDraft({ scheduledTime: slot })}
-                    style={[
-                      styles.selectionChip,
-                      styles.timeChip,
-                      active && styles.selectionChipActive,
-                    ]}
-                    accessibilityState={{ selected: active }}
-                    accessibilityLabel={formatTimeDisplay(slot)}
-                  >
-                    <Text
-                      style={[
-                        styles.selectionChipText,
-                        active && styles.selectionChipTextActive,
-                      ]}
-                    >
-                      {formatTimeDisplay(slot)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+        <View style={styles.section}>
+          <SectionHeader
+            title="Select services"
+            actionLabel={
+              selectedServices.length ? `${selectedServices.length} selected` : 'Choose one or more'
+            }
+          />
+          {services.length > 0 ? (
+            <View style={styles.serviceList}>
+              {services.map((service) => (
+                <BookingServiceRow
+                  key={service.id}
+                  service={service}
+                  selected={selectedServiceIds.includes(service.id)}
+                  bookingMode={draft.bookingMode}
+                  onPress={() => toggleService(service.id)}
+                />
+              ))}
             </View>
           ) : (
             <View style={styles.noSlotsBox}>
-              <Text style={styles.noSlotsTitle}>No slots on this date</Text>
+              <Text style={styles.noSlotsTitle}>No services available</Text>
               <Text style={styles.noSlotsBody}>
-                All slots on {selectedDateLabel} are taken or unavailable. Try another date.
+                This vendor does not have bookable services right now.
               </Text>
-              {nextAvailableDate && nextAvailableDate.value !== draft.scheduledDate ? (
-                <AppButton
-                  label={`Try ${nextAvailableDate.label}`}
-                  variant="secondary"
-                  onPress={() =>
-                    updateDraft({
-                      scheduledDate: nextAvailableDate.value,
-                      scheduledTime: undefined,
-                    })
-                  }
-                />
-              ) : null}
+              <AppButton
+                label="Back to vendor"
+                variant="secondary"
+                onPress={() => router.back()}
+              />
+            </View>
+          )}
+        </View>
+
+        <AppCard style={styles.card}>
+          <SectionHeader title="Appointment date" actionLabel={`Book up to ${DATE_WINDOW} days ahead`} />
+          <View style={styles.calendarTop}>
+            <View style={styles.calendarTitle}>
+              <Text style={styles.calendarMonth}>{formatMonthYear(visibleMonth)}</Text>
+              <Text style={styles.calendarWindow}>{bookingWindowLabel} booking window</Text>
+            </View>
+            <View style={styles.calendarControls}>
+              <CalendarNavButton
+                label="Previous month"
+                disabled={previousMonthDisabled}
+                direction="previous"
+                onPress={() => setVisibleMonth((month) => addMonths(month, -1))}
+              />
+              <CalendarNavButton
+                label="Next month"
+                disabled={nextMonthDisabled}
+                direction="next"
+                onPress={() => setVisibleMonth((month) => addMonths(month, 1))}
+              />
+            </View>
+          </View>
+
+          <View style={styles.calendarGrid}>
+            {WEEKDAY_LABELS.map((weekday) => (
+              <View key={weekday} style={styles.dateCellWrap}>
+                <Text style={styles.weekdayLabel}>{weekday}</Text>
+              </View>
+            ))}
+            {calendarDates.map((dateState) => {
+              const active = draft.scheduledDate === dateState.value;
+              const disabled = !dateState.hasSlots || dateState.isOutOfWindow;
+              const statusLabel = dateState.isOutOfWindow
+                ? 'out of booking window'
+                : dateState.isFullyBooked
+                  ? 'fully booked'
+                  : dateState.isClosed
+                    ? 'closed'
+                    : dateState.isLimited
+                      ? 'limited availability'
+                      : 'available';
+
+              return (
+                <View key={dateState.value} style={styles.dateCellWrap}>
+                  <Pressable
+                    onPress={() => selectDate(dateState)}
+                    disabled={disabled}
+                    style={[
+                      styles.dateCell,
+                      !dateState.isInDisplayedMonth && styles.dateCellOutsideMonth,
+                      dateState.hasSlots && styles.dateCellAvailable,
+                      dateState.isLimited && !active && styles.dateCellLimited,
+                      (dateState.isClosed || dateState.isFullyBooked || dateState.isOutOfWindow) &&
+                        styles.dateCellUnavailable,
+                      active && styles.dateCellSelected,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active, disabled }}
+                    accessibilityLabel={`${dateState.label} ${statusLabel}`}
+                  >
+                    <Text
+                      style={[
+                        styles.dateCellText,
+                        !dateState.isInDisplayedMonth && styles.dateCellTextMuted,
+                        (dateState.isClosed || dateState.isFullyBooked || dateState.isOutOfWindow) &&
+                          styles.dateCellTextMuted,
+                        dateState.isLimited && !active && styles.dateCellTextLimited,
+                        active && styles.dateCellTextSelected,
+                      ]}
+                    >
+                      {dateState.day}
+                    </Text>
+                    {(dateState.isLimited || dateState.isToday) && !active ? (
+                      <View style={styles.dateDot} />
+                    ) : null}
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={styles.calendarLegend}>
+            <LegendItem label="Open" color={colors.surfaceBrand} />
+            <LegendItem label="Limited" color={colors.surfaceAccent} />
+            <LegendItem label="Closed/full" color={colors.borderStrong} />
+          </View>
+
+          {!nextAvailableDate ? (
+            <View style={styles.noSlotsBox}>
+              <Text style={styles.noSlotsTitle}>No availability in the next {DATE_WINDOW} days</Text>
+              <Text style={styles.noSlotsBody}>
+                This vendor has no open slots in the current booking window.
+              </Text>
+            </View>
+          ) : null}
+        </AppCard>
+
+        <AppCard style={styles.card}>
+          <SectionHeader
+            title="Available time slots"
+            actionLabel={draft.scheduledDate ? selectedDateLabel : 'Choose a date'}
+          />
+          {draft.scheduledDate ? (
+            availableTimeSlots.length > 0 ? (
+              <View style={styles.timeGrid}>
+                {availableTimeSlots.map((slot) => {
+                  const active = draft.scheduledTime === slot;
+                  return (
+                    <Pressable
+                      key={slot}
+                      onPress={() => updateDraft({ scheduledTime: slot })}
+                      style={[styles.timeSlot, active && styles.timeSlotSelected]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityLabel={formatTimeDisplay(slot)}
+                    >
+                      <Text style={[styles.timeSlotText, active && styles.timeSlotTextSelected]}>
+                        {formatTimeDisplay(slot)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.noSlotsBox}>
+                <Text style={styles.noSlotsTitle}>No slots on this date</Text>
+                <Text style={styles.noSlotsBody}>
+                  All slots on {selectedDateLabel} are taken or unavailable. Try another date.
+                </Text>
+                {nextAvailableDate && nextAvailableDate.value !== draft.scheduledDate ? (
+                  <AppButton
+                    label={`Try ${nextAvailableDate.label}`}
+                    variant="secondary"
+                    onPress={() =>
+                      updateDraft({
+                        scheduledDate: nextAvailableDate.value,
+                        scheduledTime: undefined,
+                      })
+                    }
+                  />
+                ) : null}
+              </View>
+            )
+          ) : (
+            <View style={styles.slotPrompt}>
+              <Text style={styles.noSlotsTitle}>Choose a date to see available times</Text>
+              <Text style={styles.noSlotsBody}>
+                Time slots populate after a specific appointment date is selected.
+              </Text>
             </View>
           )}
         </AppCard>
-      ) : null}
 
-      <BookingSummaryCard
-        title="Total estimate"
-        rows={[
-          { label: 'Selected services', value: `${selectedServices.length}` },
-          { label: 'Subtotal', value: `$${subtotal.toFixed(2)}` },
-          { label: 'Service fee', value: `$${serviceFee.toFixed(2)}` },
-          { label: 'Estimated total', value: `$${total.toFixed(2)}` },
-        ]}
-      />
+        {!canConfirm ? (
+          <Text style={styles.validationText}>
+            Select at least one service, a date, and a time slot before confirming.
+          </Text>
+        ) : null}
 
-      {!canConfirm ? (
-        <Text style={styles.validationText}>
-          Select at least one service, a date, and a time slot before confirming.
-        </Text>
-      ) : null}
+        {!session && guestMode ? (
+          <Text style={styles.validationText}>
+            Sign in before confirming so the booking is saved to your account.
+          </Text>
+        ) : null}
+      </ScrollView>
 
-      {draft.vehicleId && !savedVehicle ? (
-        <Text style={styles.validationText}>
-          Choose a vehicle saved to the current account before confirming.
-        </Text>
-      ) : null}
-
-      {!session && guestMode ? (
-        <Text style={styles.validationText}>
-          Sign in before confirming so the booking is saved to your account.
-        </Text>
-      ) : null}
-
-      <AppButton
-        label={session ? 'Confirm Booking' : 'Sign In to Confirm'}
-        variant="accent"
-        disabled={!canConfirm}
-        onPress={confirmBooking}
-      />
-    </Screen>
+      <View style={[styles.bookingBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        <View style={styles.estimateRow}>
+          <View style={styles.estimateBlock}>
+            <Text style={styles.estimateLabel}>Total estimate</Text>
+            <Text style={styles.estimateValue}>${total.toFixed(2)}</Text>
+          </View>
+          <View style={[styles.estimateBlock, styles.estimateBlockRight]}>
+            <Text style={styles.estimateLabel}>
+              {selectedServices.length} {selectedServices.length === 1 ? 'service' : 'services'}
+            </Text>
+            <Text style={styles.estimateValueSmall}>
+              {draft.scheduledTime ? selectedTimeLabel : selectedDateLabel}
+            </Text>
+          </View>
+        </View>
+        <AppButton
+          label={session ? 'Book Appointment' : 'Sign In to Confirm'}
+          variant="accent"
+          disabled={!canConfirm}
+          onPress={confirmBooking}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
+function BookingServiceRow({
+  service,
+  selected,
+  bookingMode,
+  onPress,
+}: {
+  service: Service;
+  selected: boolean;
+  bookingMode?: 'shop' | 'mobile';
+  onPress: () => void;
+}) {
+  const modeLabel =
+    bookingMode === 'mobile' ? 'Mobile service' : bookingMode === 'shop' ? 'Shop visit' : 'Shop or mobile';
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.serviceRow, selected && styles.serviceRowSelected, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`${service.title}, $${service.price}, ${service.durationMinutes} minutes`}
+    >
+      <View style={styles.serviceCopy}>
+        <Text style={styles.serviceTitle}>{service.title}</Text>
+        {service.description ? (
+          <Text style={styles.serviceDescription}>{service.description}</Text>
+        ) : null}
+        <View style={styles.serviceMeta}>
+          <Text style={styles.metaChip}>{modeLabel}</Text>
+          <Text style={[styles.metaChip, styles.metaChipSuccess]}>{formatCategory(service.category)}</Text>
+        </View>
+      </View>
+      <View style={styles.priceStack}>
+        <Text style={styles.price}>${service.price}</Text>
+        <Text style={styles.duration}>{service.durationMinutes} mins</Text>
+        <View style={[styles.checkDot, selected && styles.checkDotSelected]}>
+          <View style={[styles.checkDotInner, selected && styles.checkDotInnerSelected]} />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function CalendarNavButton({
+  direction,
+  disabled,
+  label,
+  onPress,
+}: {
+  direction: 'previous' | 'next';
+  disabled: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={[styles.calendarNav, disabled && styles.calendarNavDisabled]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+    >
+      <Text style={[styles.calendarNavIcon, disabled && styles.calendarNavIconDisabled]}>
+        {direction === 'previous' ? '<' : '>'}
+      </Text>
+    </Pressable>
+  );
+}
+
+function LegendItem({ label, color }: { label: string; color: string }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={[styles.legendDot, { backgroundColor: color }]} />
+      <Text style={styles.legendLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function formatCategory(category: string) {
+  return category.replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.bgBase,
+  },
+  fill: {
+    flex: 1,
+  },
+  content: {
+    padding: spacing.page,
+    gap: spacing.xl,
+  },
   section: { gap: spacing.md },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   card: { gap: spacing.md },
-  selectionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  selectionChip: {
-    minHeight: 44,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.full,
+  serviceList: {
+    gap: spacing.sm,
+  },
+  serviceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderDefault,
     backgroundColor: colors.bgElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
+    ...shadows.floating,
+  },
+  serviceRowSelected: {
+    borderColor: 'rgba(15, 76, 129, 0.46)',
+    backgroundColor: '#F6FBFF',
+  },
+  pressed: {
+    opacity: 0.92,
+  },
+  serviceCopy: {
+    flex: 1,
+    minWidth: 0,
     gap: spacing.xs,
   },
-  selectionChipActive: {
-    backgroundColor: colors.bgStrong,
-    borderColor: colors.bgStrong,
+  serviceTitle: {
+    ...typography.labelLg,
+    color: colors.textPrimary,
   },
-  selectionChipLimited: {
+  serviceDescription: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  serviceMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  metaChip: {
+    ...typography.caption,
+    minHeight: 24,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgBase,
+    color: colors.textSecondary,
+    overflow: 'hidden',
+  },
+  metaChipSuccess: {
+    borderColor: '#BBF7D0',
+    backgroundColor: colors.surfaceSubtleGreen,
+    color: colors.completed,
+  },
+  priceStack: {
+    minWidth: 74,
+    alignItems: 'flex-end',
+  },
+  price: {
+    ...typography.labelLg,
+    color: colors.surfaceAccent,
+  },
+  duration: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  checkDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+  },
+  checkDotSelected: {
+    borderColor: colors.surfaceBrand,
+    backgroundColor: colors.surfaceBrand,
+  },
+  checkDotInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'transparent',
+  },
+  checkDotInnerSelected: {
+    backgroundColor: colors.textInverse,
+  },
+  calendarTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  calendarTitle: {
+    flex: 1,
+    minWidth: 0,
+  },
+  calendarMonth: {
+    ...typography.labelLg,
+    color: colors.textPrimary,
+  },
+  calendarWindow: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  calendarControls: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  calendarNav: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgBase,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarNavDisabled: {
+    backgroundColor: '#F1F5F9',
+  },
+  calendarNavIcon: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 28,
+    lineHeight: 30,
+    color: colors.textPrimary,
+  },
+  calendarNavIconDisabled: {
+    color: colors.textTertiary,
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -3,
+    rowGap: 6,
+  },
+  dateCellWrap: {
+    width: '14.2857%',
+    paddingHorizontal: 3,
+  },
+  weekdayLabel: {
+    ...typography.caption,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    color: colors.textTertiary,
+    marginBottom: spacing.xs,
+  },
+  dateCell: {
+    minHeight: 44,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+  },
+  dateCellAvailable: {
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgBase,
+  },
+  dateCellLimited: {
     borderColor: '#FED7AA',
     backgroundColor: colors.surfaceSubtleOrange,
   },
-  selectionChipBooked: {
-    opacity: 0.4,
-    backgroundColor: colors.bgBase,
+  dateCellUnavailable: {
+    backgroundColor: '#F1F5F9',
   },
-  selectionChipText: {
+  dateCellOutsideMonth: {
+    opacity: 0.62,
+  },
+  dateCellSelected: {
+    borderColor: colors.surfaceBrand,
+    backgroundColor: colors.surfaceBrand,
+  },
+  dateCellText: {
     ...typography.labelMd,
-    color: colors.textSecondary,
+    color: colors.textPrimary,
   },
-  selectionChipTextActive: {
+  dateCellTextMuted: {
+    color: colors.textTertiary,
+  },
+  dateCellTextLimited: {
+    color: colors.pending,
+  },
+  dateCellTextSelected: {
     color: colors.textInverse,
   },
-  selectionChipTextBooked: {
-    color: colors.textTertiary,
+  dateDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.surfaceAccent,
+    marginTop: 2,
   },
-  limitedBadge: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 10,
-    lineHeight: 12,
-    color: colors.pending,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+  calendarLegend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
   },
-  bookedBadge: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 10,
-    lineHeight: 12,
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  timeChip: { minWidth: 104 },
+  legendDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+  legendLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  timeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  timeSlot: {
+    width: '31.5%',
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgBase,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+  },
+  timeSlotSelected: {
+    borderColor: colors.bgStrong,
+    backgroundColor: colors.bgStrong,
+  },
+  timeSlotText: {
+    ...typography.labelMd,
+    fontSize: 13,
+    color: colors.textPrimary,
+  },
+  timeSlotTextSelected: {
+    color: colors.textInverse,
+  },
   noSlotsBox: {
     gap: spacing.md,
     padding: spacing.lg,
@@ -498,6 +984,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgBase,
     borderWidth: 1,
     borderColor: colors.borderDefault,
+    alignItems: 'center',
+  },
+  slotPrompt: {
+    gap: spacing.sm,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.bgBase,
     alignItems: 'center',
   },
   noSlotsTitle: {
@@ -513,5 +1009,47 @@ const styles = StyleSheet.create({
   validationText: {
     ...typography.caption,
     color: colors.pending,
+  },
+  bookingBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderDefault,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    ...shadows.card,
+  },
+  estimateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.lg,
+    alignItems: 'flex-end',
+    marginBottom: spacing.sm,
+  },
+  estimateBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  estimateBlockRight: {
+    alignItems: 'flex-end',
+  },
+  estimateLabel: {
+    ...typography.caption,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: colors.textSecondary,
+  },
+  estimateValue: {
+    ...typography.titleSm,
+    color: colors.textPrimary,
+    marginTop: 2,
+  },
+  estimateValueSmall: {
+    ...typography.labelMd,
+    color: colors.textPrimary,
+    marginTop: 2,
+    textAlign: 'right',
   },
 });
