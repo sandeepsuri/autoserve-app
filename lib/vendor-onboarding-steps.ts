@@ -1,4 +1,4 @@
-import { Href } from 'expo-router';
+import type { Href } from 'expo-router';
 
 import { BusinessType, VendorLocationMode, VendorOnboardingDraft } from '@/types/domain';
 
@@ -18,6 +18,7 @@ export type VendorOnboardingStepId =
   | 'business-info'
   | 'location'
   | 'services'
+  | 'availability'
   | 'review';
 
 export interface VendorOnboardingStep {
@@ -32,7 +33,8 @@ export const VENDOR_ONBOARDING_STEPS: VendorOnboardingStep[] = [
   { id: 'business-info', route: '/(auth)/vendor-onboarding/business-info', label: 'Business info', index: 1 },
   { id: 'location', route: '/(auth)/vendor-onboarding/location', label: 'Location', index: 2 },
   { id: 'services', route: '/(auth)/vendor-onboarding/services', label: 'Services', index: 3 },
-  { id: 'review', route: '/(auth)/vendor-onboarding/review', label: 'Review', index: 4 },
+  { id: 'availability', route: '/(auth)/vendor-onboarding/availability' as Href, label: 'Availability', index: 4 },
+  { id: 'review', route: '/(auth)/vendor-onboarding/review', label: 'Review', index: 5 },
 ];
 
 export function getStep(id: VendorOnboardingStepId): VendorOnboardingStep {
@@ -73,6 +75,8 @@ export function isDraftReadyFor(id: VendorOnboardingStepId, draft: VendorOnboard
       return Boolean(draft.location?.address?.trim());
     case 'services':
       return hasValidService;
+    case 'availability':
+      return hasValidService; // availability step requires services to be done first
     case 'review':
       return Boolean(draft.businessType) && Boolean(draft.profile?.businessName?.trim()) && hasValidService;
   }

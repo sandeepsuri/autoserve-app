@@ -2,6 +2,8 @@ import { ensureProfileRow } from './auth';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
+import { useVendorAvailabilityStore } from '@/store/useVendorAvailabilityStore';
+import { saveVendorAvailability } from './vendor-availability';
 import {
   BusinessType,
   Coordinates,
@@ -519,6 +521,12 @@ export async function submitVendorOnboarding(patch?: VendorOnboardingDraftPatch)
       .forEach((service) => demo.removeService(service.id));
     services.forEach((service) => demo.upsertService(service));
     demo.saveOnboardingDraft(draft);
+    // Persist availability from the store into demo data
+    const currentAvailability = useVendorAvailabilityStore.getState().availability;
+    demo.saveVendorAvailability(vendorId, {
+      ...currentAvailability,
+      publishedAt: new Date().toISOString(),
+    });
     useAuthStore.getState().setSessionData(session, {
       id: session.userId,
       email: session.email,
@@ -643,6 +651,14 @@ export async function submitVendorOnboarding(patch?: VendorOnboardingDraftPatch)
     onConflict: 'owner_id',
   });
   if (draftError) throw draftError;
+
+  // Persist vendor availability captured during the onboarding flow
+  try {
+    const currentAvailability = useVendorAvailabilityStore.getState().availability;
+    await saveVendorAvailability(currentAvailability, vendorId);
+  } catch {
+    // Non-fatal: availability can be set later from the vendor bookings tab
+  }
 
   useAuthStore.getState().setSessionData(session, {
     id: session.userId,

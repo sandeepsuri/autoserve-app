@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -9,6 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
+
+import { AdjustAvailabilityModal } from '@/components/AdjustAvailabilityModal';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -19,7 +21,10 @@ import { colors, radius, shadows, spacing, typography } from '@/constants/theme'
 import { STATUS_COLORS, STATUS_LABEL } from '@/lib/booking-status';
 import { listBookingsForVendorOwner, updateBookingStatus } from '@/lib/bookings';
 import { formatScheduledEST } from '@/lib/format';
+import { getVendorForOwner } from '@/lib/vendor-admin';
+import { loadVendorAvailability } from '@/lib/vendor-availability';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useVendorAvailabilityStore } from '@/store/useVendorAvailabilityStore';
 import { BookingRecord } from '@/types/domain';
 
 type StatusTab = 'pending' | 'confirmed' | 'completed' | 'cancelled';
@@ -56,6 +61,7 @@ export default function VendorBookingsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<StatusTab>('pending');
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const userId = useAuthStore((s) => s.session?.userId ?? 'anon');
 
   const { data: bookings = [], isLoading, error } = useQuery({
@@ -63,6 +69,27 @@ export default function VendorBookingsScreen() {
     queryFn: () => listBookingsForVendorOwner(userId),
     enabled: userId !== 'anon',
   });
+
+  // Resolve the signed-in owner's vendor + load its saved availability so the
+  // Adjust availability modal reflects what's persisted (not local defaults)
+  // and saves against an explicit vendorId.
+  const setAvailability = useVendorAvailabilityStore((s) => s.setAvailability);
+  const { data: vendorAvailability } = useQuery({
+    queryKey: ['vendor-availability', userId],
+    queryFn: async () => {
+      const vendor = await getVendorForOwner();
+      if (!vendor) return null;
+      const availability = await loadVendorAvailability(vendor.id);
+      return { vendorId: vendor.id, availability };
+    },
+    enabled: userId !== 'anon',
+  });
+
+  useEffect(() => {
+    if (vendorAvailability?.availability) {
+      setAvailability(vendorAvailability.availability);
+    }
+  }, [vendorAvailability, setAvailability]);
 
   const filtered = bookings.filter((b) => b.status === tab);
 
@@ -361,9 +388,16 @@ export default function VendorBookingsScreen() {
           label="Adjust availability"
           variant="primary"
           style={styles.availabilityButton}
-          onPress={() => router.push('/(vendor)/location')}
+          onPress={() => setAvailabilityOpen(true)}
         />
       </View>
+
+      {/* Adjust Availability modal — Ticket 2 */}
+      <AdjustAvailabilityModal
+        visible={availabilityOpen}
+        onClose={() => setAvailabilityOpen(false)}
+        vendorId={vendorAvailability?.vendorId}
+      />
     </Screen>
   );
 }
