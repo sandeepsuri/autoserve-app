@@ -25,6 +25,14 @@ export type ServiceCategory =
   | 'detailing'
   | 'tint';
 export type VendorLocationMode = 'fixed' | 'mobile' | 'hybrid';
+export type VendorApplicationStatus =
+  | 'draft'
+  | 'submitted'
+  | 'under_review'
+  | 'approved'
+  | 'rejected'
+  | 'needs_more_info'
+  | 'suspended';
 
 export interface AppSession {
   userId: string;
@@ -105,6 +113,8 @@ export interface VendorOnboardingServiceDraft {
 
 export interface VendorOnboardingDraft {
   ownerId: string;
+  applicationId?: string;
+  applicationStatus?: VendorApplicationStatus;
   businessType?: BusinessType;
   profile: VendorOnboardingProfileDraft;
   location: VendorOnboardingLocationDraft;
@@ -113,6 +123,19 @@ export interface VendorOnboardingDraft {
   availabilityConfigured?: boolean;
   completed: boolean;
   submittedAt?: string;
+  updatedAt?: string;
+}
+
+export interface VendorApplication {
+  id: string;
+  ownerId: string;
+  status: VendorApplicationStatus;
+  businessType?: BusinessType;
+  profile: VendorOnboardingProfileDraft;
+  location: VendorOnboardingLocationDraft;
+  services: VendorOnboardingServiceDraft[];
+  submittedAt?: string;
+  reviewerNotes?: string;
   updatedAt?: string;
 }
 

@@ -57,6 +57,7 @@ const demoState = {
     },
   ],
   onboardingDrafts: [] as Array<{ ownerId: string }>,
+  vendorApplications: [] as Array<{ ownerId: string; status: string }>,
   addOrUpdateProfile: jest.fn(),
   addVehicle: jest.fn(),
   addBooking: jest.fn(),
@@ -73,12 +74,21 @@ const demoState = {
       demoState.onboardingDrafts.push(draft);
     }
   }),
+  saveVendorApplication: jest.fn((application) => {
+    const index = demoState.vendorApplications.findIndex((item: { ownerId: string }) => item.ownerId === application.ownerId);
+    if (index >= 0) {
+      demoState.vendorApplications[index] = application;
+    } else {
+      demoState.vendorApplications.push(application);
+    }
+  }),
   saveVendorAvailability: jest.fn(),
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
   demoState.onboardingDrafts = [];
+  demoState.vendorApplications = [];
   mockAuthGetState.mockReturnValue({
     session: { userId: 'vendor-owner-1', email: 'riverside@autoserve.app' },
     profile: {
@@ -147,7 +157,7 @@ describe('vendor onboarding draft service', () => {
     ).rejects.toThrow('Vendor onboarding submission invalid');
   });
 
-  it('submits a valid draft and syncs demo profile, vendor, and services', async () => {
+  it('submits a valid application without publishing a live vendor in demo mode', async () => {
     const draft = await submitVendorOnboarding({
       businessType: 'shop',
       profile: {
@@ -178,36 +188,16 @@ describe('vendor onboarding draft service', () => {
 
     expect(draft.completed).toBe(true);
     expect(draft.submittedAt).toBeDefined();
-    expect(demoState.addOrUpdateProfile).toHaveBeenCalledWith(
+    expect(draft.applicationStatus).toBe('submitted');
+    expect(demoState.saveVendorApplication).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: 'vendor-owner-1',
-        role: 'vendor',
-        businessType: 'shop',
+        ownerId: 'vendor-owner-1',
+        status: 'submitted',
+        profile: expect.objectContaining({ businessName: 'Riverside Garage' }),
       }),
     );
-    expect(demoState.upsertVendor).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: 'vendor-1',
-        name: 'Riverside Garage',
-        mobileServiceEnabled: true,
-        serviceRadiusMiles: 30,
-      }),
-    );
-    expect(demoState.removeService).toHaveBeenCalledWith('service-1');
-    expect(demoState.upsertService).toHaveBeenCalledWith(
-      expect.objectContaining({
-        vendorId: 'vendor-1',
-        title: 'Brake Check',
-        category: 'brakes',
-      }),
-    );
-    expect(mockSetSessionData).toHaveBeenCalledWith(
-      { userId: 'vendor-owner-1', email: 'riverside@autoserve.app' },
-      expect.objectContaining({
-        fullName: 'Alex Rivers',
-        phone: '+1 310 555 0101',
-        businessType: 'shop',
-      }),
-    );
+    expect(demoState.addOrUpdateProfile).not.toHaveBeenCalled();
+    expect(demoState.upsertVendor).not.toHaveBeenCalled();
+    expect(mockSetSessionData).not.toHaveBeenCalled();
   });
 });

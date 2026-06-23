@@ -84,7 +84,7 @@ export async function listVendors(filters: Partial<DiscoveryFilters> = {}) {
     return isDemoDataEnabled ? filterVendors(useDemoDataStore.getState().vendors, merged) : [];
   }
 
-  const { data, error } = await supabase.from('vendors').select('*');
+  const { data, error } = await supabase.from('vendors').select('*').eq('is_active', true);
   if (error) {
     throw new Error(error.message ?? 'Failed to load vendors from Supabase.');
   }
@@ -122,7 +122,7 @@ export async function getVendorDetail(vendorId: string): Promise<{
   }
 
   const [vendorResult, servicesResult, reviewsResult, availability] = await Promise.all([
-    supabase.from('vendors').select('*').eq('id', vendorId).maybeSingle(),
+    supabase.from('vendors').select('*').eq('id', vendorId).eq('is_active', true).maybeSingle(),
     supabase.from('services').select('*').eq('vendor_id', vendorId).eq('active', true),
     supabase.from('reviews').select('*').eq('vendor_id', vendorId).order('created_at', { ascending: false }),
     loadVendorAvailability(vendorId).catch(() => makeDefaultAvailability()),

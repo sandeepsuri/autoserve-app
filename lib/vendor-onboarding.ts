@@ -2,8 +2,6 @@ import { ensureProfileRow } from './auth';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
-import { useVendorAvailabilityStore } from '@/store/useVendorAvailabilityStore';
-import { saveVendorAvailability } from './vendor-availability';
 import {
   BusinessType,
   Coordinates,
@@ -16,6 +14,7 @@ import {
   VendorOnboardingLocationDraft,
   VendorOnboardingServiceDraft,
   VendorSummary,
+  VendorApplicationStatus,
 } from '@/types/domain';
 
 import { isSupabaseConfigured, supabase } from './supabase';
@@ -56,8 +55,10 @@ type ServiceRow = {
   image?: string | null;
 };
 
-type VendorOnboardingDraftRow = {
+type VendorApplicationRow = {
+  id: string;
   owner_id: string;
+  status: VendorApplicationStatus;
   business_type: BusinessType | null;
   business_name: string | null;
   business_description: string | null;
@@ -70,8 +71,8 @@ type VendorOnboardingDraftRow = {
   longitude: number | null;
   service_radius_miles: number | null;
   service_catalog: unknown;
-  completed: boolean | null;
   submitted_at: string | null;
+  reviewer_notes: string | null;
   updated_at: string | null;
 };
 
@@ -239,9 +240,12 @@ function coerceServiceCatalog(
   });
 }
 
-function rowToDraft(row: VendorOnboardingDraftRow, profile?: UserProfile | null): VendorOnboardingDraft {
+function rowToDraft(row: VendorApplicationRow, profile?: UserProfile | null): VendorOnboardingDraft {
+  const isSubmitted = row.status !== 'draft' && row.status !== 'needs_more_info';
   return {
     ownerId: row.owner_id,
+    applicationId: row.id,
+    applicationStatus: row.status,
     businessType: row.business_type ?? profile?.businessType,
     profile: {
       businessName: row.business_name ?? undefined,
@@ -257,13 +261,13 @@ function rowToDraft(row: VendorOnboardingDraftRow, profile?: UserProfile | null)
       serviceRadiusMiles: row.service_radius_miles ?? undefined,
     },
     services: coerceServiceCatalog(row.service_catalog),
-    completed: row.completed ?? false,
+    completed: isSubmitted || Boolean(row.submitted_at),
     submittedAt: row.submitted_at ?? undefined,
     updatedAt: row.updated_at ?? undefined,
   };
 }
 
-function draftToRow(draft: VendorOnboardingDraft): Omit<VendorOnboardingDraftRow, 'updated_at'> {
+function draftToApplicationRow(draft: VendorOnboardingDraft): Omit<VendorApplicationRow, 'id' | 'status' | 'reviewer_notes' | 'updated_at'> {
   return {
     owner_id: draft.ownerId,
     business_type: draft.businessType ?? null,
@@ -278,7 +282,6 @@ function draftToRow(draft: VendorOnboardingDraft): Omit<VendorOnboardingDraftRow
     longitude: draft.location.coordinates?.longitude ?? null,
     service_radius_miles: draft.location.serviceRadiusMiles ?? null,
     service_catalog: draft.services,
-    completed: draft.completed,
     submitted_at: draft.submittedAt ?? null,
   };
 }
@@ -326,77 +329,13 @@ function validateSubmission(draft: VendorOnboardingDraft) {
   return errors;
 }
 
-function normalizeDemoVendorServices(vendorId: string, services: VendorOnboardingServiceDraft[]): Service[] {
-  return services.map((service) => ({
-    id: service.id ?? createDemoId('service'),
-    vendorId,
-    title: service.title!.trim(),
-    category: service.category!,
-    description: service.description?.trim() || undefined,
-    durationMinutes: service.durationMinutes!,
-    price: service.price!,
-    active: service.active ?? true,
-  }));
-}
-
-function toVendorSummary(
-  vendorId: string,
-  draft: VendorOnboardingDraft,
-  existingVendor?: VendorSummary | VendorRow | null,
-): VendorSummary {
-  const mobileEnabled = draft.location.mode === 'mobile' || draft.location.mode === 'hybrid';
-  const coordinates = {
-    latitude: draft.location.coordinates!.latitude!,
-    longitude: draft.location.coordinates!.longitude!,
-  };
-  const categories = Array.from(
-    new Set(
-      draft.services
-        .map((service) => service.category)
-        .filter((category): category is ServiceCategory => Boolean(category)),
-    ),
-  );
-
-  return {
-    id: vendorId,
-    ownerId: draft.ownerId,
-    businessType: draft.businessType!,
-    name: draft.profile.businessName!,
-    description: draft.profile.description!.trim(),
-    address: draft.location.address!,
-    distanceMiles: existingVendor ? (isVendorSummary(existingVendor) ? existingVendor.distanceMiles : existingVendor.distance_miles ?? 0) : 0,
-    rating: existingVendor ? (isVendorSummary(existingVendor) ? existingVendor.rating : existingVendor.rating ?? 0) : 0,
-    reviewCount: existingVendor
-      ? isVendorSummary(existingVendor)
-        ? existingVendor.reviewCount
-        : existingVendor.review_count ?? 0
-      : 0,
-    mobileServiceEnabled: mobileEnabled,
-    serviceRadiusMiles: draft.location.serviceRadiusMiles ?? 0,
-    nextAvailable:
-      (existingVendor
-        ? isVendorSummary(existingVendor)
-          ? existingVendor.nextAvailable
-          : existingVendor.next_available
-        : undefined) ?? '',
-    heroImage:
-      (existingVendor
-        ? isVendorSummary(existingVendor)
-          ? existingVendor.heroImage
-          : existingVendor.hero_image
-        : undefined) ?? '',
-    serviceCategories: categories,
-    coordinates,
-  };
-}
-
 async function loadLiveVendorState(ownerId: string) {
-  const [draftResult, vendorResult] = await Promise.all([
-    supabase!.from('vendor_onboarding_drafts').select('*').eq('owner_id', ownerId).maybeSingle(),
+  const [applicationResult, vendorResult] = await Promise.all([
+    supabase!.from('vendor_applications').select('*').eq('owner_id', ownerId).maybeSingle(),
     supabase!.from('vendors').select('*').eq('owner_id', ownerId).maybeSingle(),
   ]);
 
-  if (draftResult.error) throw draftResult.error;
+  if (applicationResult.error) throw applicationResult.error;
   if (vendorResult.error) throw vendorResult.error;
 
   const vendor = vendorResult.data as VendorRow | null;
@@ -409,7 +348,7 @@ async function loadLiveVendorState(ownerId: string) {
   }
 
   return {
-    draftRow: draftResult.data as VendorOnboardingDraftRow | null,
+    applicationRow: applicationResult.data as VendorApplicationRow | null,
     vendor,
     services,
   };
@@ -418,7 +357,9 @@ async function loadLiveVendorState(ownerId: string) {
 function getDemoVendorState(ownerId: string) {
   const demo = useDemoDataStore.getState();
   const vendor = demo.vendors.find((item) => item.ownerId === ownerId) ?? null;
+  const application = demo.vendorApplications.find((item) => item.ownerId === ownerId) ?? null;
   return {
+    application,
     draft: demo.onboardingDrafts.find((item) => item.ownerId === ownerId) ?? null,
     vendor,
     services: vendor ? demo.services.filter((item) => item.vendorId === vendor.id) : [],
@@ -429,13 +370,27 @@ export async function loadVendorOnboardingDraft(): Promise<VendorOnboardingDraft
   const { session, profile } = requireSession();
 
   if (!isSupabaseConfigured || !supabase) {
-    const { draft, vendor, services } = getDemoVendorState(session.userId);
+    const { application, draft, vendor, services } = getDemoVendorState(session.userId);
+    if (application) {
+      return {
+        ownerId: application.ownerId,
+        applicationId: application.id,
+        applicationStatus: application.status,
+        businessType: application.businessType,
+        profile: application.profile,
+        location: application.location,
+        services: application.services,
+        completed: application.status !== 'draft' && application.status !== 'needs_more_info',
+        submittedAt: application.submittedAt,
+        updatedAt: application.updatedAt,
+      };
+    }
     return draft ?? buildDraftFromVendorState({ ownerId: session.userId, profile, vendor, services });
   }
 
-  const { draftRow, vendor, services } = await loadLiveVendorState(session.userId);
-  if (draftRow) {
-    return rowToDraft(draftRow, profile);
+  const { applicationRow, vendor, services } = await loadLiveVendorState(session.userId);
+  if (applicationRow) {
+    return rowToDraft(applicationRow, profile);
   }
 
   return buildDraftFromVendorState({ ownerId: session.userId, profile, vendor, services });
@@ -451,7 +406,7 @@ export async function saveVendorOnboardingDraft(patch: VendorOnboardingDraftPatc
     return draft;
   }
 
-  const { error } = await supabase.from('vendor_onboarding_drafts').upsert(draftToRow(draft), {
+  const { error } = await supabase.from('vendor_applications').upsert(draftToApplicationRow(draft), {
     onConflict: 'owner_id',
   });
 
@@ -501,179 +456,55 @@ export async function submitVendorOnboarding(patch?: VendorOnboardingDraftPatch)
 
   if (!isSupabaseConfigured || !supabase) {
     const demo = useDemoDataStore.getState();
-    const existingVendor = demo.vendors.find((item) => item.ownerId === session.userId) ?? null;
-    const vendorId = existingVendor?.id ?? createDemoId('vendor');
-    const vendor = toVendorSummary(vendorId, draft, existingVendor);
-    const services = normalizeDemoVendorServices(vendorId, draft.services);
-
-    demo.addOrUpdateProfile({
-      id: session.userId,
-      email: session.email,
-      fullName: draft.profile.contactName!,
-      phone: draft.profile.contactPhone!,
-      avatarUrl: profile?.avatarUrl,
-      role: 'vendor',
+    const applicationId = draft.applicationId ?? createDemoId('application');
+    const submittedApplication = {
+      id: applicationId,
+      ownerId: session.userId,
+      status: 'submitted' as const,
       businessType: draft.businessType,
-    });
-    demo.upsertVendor(vendor);
-    demo.services
-      .filter((service) => service.vendorId === vendorId)
-      .forEach((service) => demo.removeService(service.id));
-    services.forEach((service) => demo.upsertService(service));
-    demo.saveOnboardingDraft(draft);
-    // Persist availability from the store into demo data
-    const currentAvailability = useVendorAvailabilityStore.getState().availability;
-    demo.saveVendorAvailability(vendorId, {
-      ...currentAvailability,
-      publishedAt: new Date().toISOString(),
-    });
-    useAuthStore.getState().setSessionData(session, {
-      id: session.userId,
-      email: session.email,
-      fullName: draft.profile.contactName!,
-      phone: draft.profile.contactPhone!,
-      avatarUrl: profile?.avatarUrl,
-      role: 'vendor',
-      businessType: draft.businessType,
-    });
-    useVendorOnboardingStore.getState().setDraft(draft);
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['vendor-self', session.userId] }),
-      queryClient.invalidateQueries({ queryKey: ['vendor-services', session.userId] }),
-    ]);
-    return draft;
-  }
-
-  const { vendor } = await loadLiveVendorState(session.userId);
-  const mobileEnabled = draft.location.mode === 'mobile' || draft.location.mode === 'hybrid';
-  const vendorPayload = {
-    owner_id: session.userId,
-    business_type: draft.businessType,
-    name: draft.profile.businessName,
-    description: draft.profile.description!.trim(),
-    address: draft.location.address,
-    distance_miles: vendor?.distance_miles ?? 0,
-    rating: vendor?.rating ?? 0,
-    review_count: vendor?.review_count ?? 0,
-    mobile_service_enabled: mobileEnabled,
-    service_radius_miles: draft.location.serviceRadiusMiles ?? 0,
-    next_available: vendor?.next_available ?? null,
-    hero_image: vendor?.hero_image ?? null,
-    service_categories: Array.from(
-      new Set(
-        draft.services
-          .map((service) => service.category)
-          .filter((category): category is ServiceCategory => Boolean(category)),
-      ),
-    ),
-    latitude: draft.location.coordinates?.latitude,
-    longitude: draft.location.coordinates?.longitude,
-    location_mode: draft.location.mode,
-    contact_name: draft.profile.contactName,
-    contact_email: draft.profile.contactEmail,
-    contact_phone: draft.profile.contactPhone,
-  };
-
-  const profilePayload = {
-    id: session.userId,
-    email: session.email,
-    full_name: draft.profile.contactName,
-    phone: draft.profile.contactPhone,
-    avatar_url: profile?.avatarUrl ?? null,
-    role: 'vendor',
-    business_type: draft.businessType,
-  };
-
-  const { error: profileError } = await supabase.from('profiles').upsert(profilePayload);
-  if (profileError) throw profileError;
-
-  let vendorId = vendor?.id;
-  if (vendorId) {
-    const { error: vendorError } = await supabase
-      .from('vendors')
-      .update(vendorPayload)
-      .eq('id', vendorId)
-      .eq('owner_id', session.userId);
-    if (vendorError) throw vendorError;
-  } else {
-    const vendorInsertResult = await supabase
-      .from('vendors')
-      .insert(vendorPayload)
-      .select('id')
-      .single();
-    if (vendorInsertResult.error) throw vendorInsertResult.error;
-    vendorId = vendorInsertResult.data.id;
-  }
-
-  const existingServicesResult = await supabase.from('services').select('id').eq('vendor_id', vendorId);
-  if (existingServicesResult.error) throw existingServicesResult.error;
-
-  const existingServiceIds = new Set((existingServicesResult.data ?? []).map((item: { id: string }) => item.id));
-  const nextServiceIds = new Set(
-    draft.services
-      .map((service) => service.id)
-      .filter((id): id is string => Boolean(id)),
-  );
-  const removedIds = Array.from(existingServiceIds).filter((id) => !nextServiceIds.has(id));
-
-  if (removedIds.length) {
-    const { error: deleteError } = await supabase.from('services').delete().in('id', removedIds);
-    if (deleteError) throw deleteError;
-  }
-
-  for (const service of draft.services) {
-    const servicePayload = {
-      vendor_id: vendorId,
-      title: service.title!.trim(),
-      category: service.category!,
-      description: service.description?.trim() ?? null,
-      duration_minutes: service.durationMinutes!,
-      price: service.price!,
-      active: service.active ?? true,
-      image: null,
+      profile: {
+        businessName: draft.profile.businessName,
+        description: draft.profile.description,
+        contactName: draft.profile.contactName,
+        contactEmail: draft.profile.contactEmail,
+        contactPhone: draft.profile.contactPhone,
+      },
+      location: draft.location,
+      services: draft.services,
+      submittedAt: draft.submittedAt,
+      updatedAt: draft.updatedAt,
     };
 
-    if (service.id) {
-      const { error: serviceError } = await supabase
-        .from('services')
-        .update(servicePayload)
-        .eq('id', service.id)
-        .eq('vendor_id', vendorId);
-      if (serviceError) throw serviceError;
-      continue;
-    }
-
-    const { error: serviceInsertError } = await supabase.from('services').insert(servicePayload);
-    if (serviceInsertError) throw serviceInsertError;
+    demo.saveVendorApplication(submittedApplication);
+    demo.saveOnboardingDraft({
+      ...draft,
+      applicationId,
+      applicationStatus: 'submitted',
+    });
+    useVendorOnboardingStore.getState().setDraft({
+      ...draft,
+      applicationId,
+      applicationStatus: 'submitted',
+    });
+    return {
+      ...draft,
+      applicationId,
+      applicationStatus: 'submitted',
+    };
   }
 
-  const { error: draftError } = await supabase.from('vendor_onboarding_drafts').upsert(draftToRow(draft), {
+  const applicationPayload = draftToApplicationRow(draft);
+  const { error: applicationError } = await supabase.from('vendor_applications').upsert(applicationPayload, {
     onConflict: 'owner_id',
   });
-  if (draftError) throw draftError;
+  if (applicationError) throw applicationError;
 
-  // Persist vendor availability captured during the onboarding flow
-  try {
-    const currentAvailability = useVendorAvailabilityStore.getState().availability;
-    await saveVendorAvailability(currentAvailability, vendorId);
-  } catch {
-    // Non-fatal: availability can be set later from the vendor bookings tab
-  }
+  const { data: submittedApplication, error: submitError } = await supabase.rpc('submit_vendor_application');
+  if (submitError) throw submitError;
 
-  useAuthStore.getState().setSessionData(session, {
-    id: session.userId,
-    email: session.email,
-    fullName: draft.profile.contactName!,
-    phone: draft.profile.contactPhone!,
-    avatarUrl: profile?.avatarUrl,
-    role: 'vendor',
-    businessType: draft.businessType,
-  });
-  useVendorOnboardingStore.getState().setDraft(draft);
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ['vendor-self', session.userId] }),
-    queryClient.invalidateQueries({ queryKey: ['vendor-services', session.userId] }),
-  ]);
+  const submittedDraft = rowToDraft(submittedApplication as VendorApplicationRow, profile);
+  useVendorOnboardingStore.getState().setDraft(submittedDraft);
+  await queryClient.invalidateQueries({ queryKey: ['vendor-application', session.userId] });
 
-  return draft;
+  return submittedDraft;
 }
