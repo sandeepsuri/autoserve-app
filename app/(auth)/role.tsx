@@ -8,6 +8,7 @@ import { AppCard } from '@/components/AppCard';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
 import { setRole } from '@/lib/auth';
+import { VENDOR_APPLICATION_PATH } from '@/lib/route-gate';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export default function RoleSelectionScreen() {
@@ -54,8 +55,9 @@ export default function RoleSelectionScreen() {
           label="Apply to Become a Vendor"
           variant="secondary"
           onPress={async () => {
+            setPostAuthPath(VENDOR_APPLICATION_PATH);
             await setRole('client');
-            router.push('/(auth)/vendor-setup');
+            router.push(VENDOR_APPLICATION_PATH as never);
           }}
         />
       </AppCard>

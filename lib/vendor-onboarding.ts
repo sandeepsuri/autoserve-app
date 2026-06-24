@@ -76,6 +76,14 @@ type VendorApplicationRow = {
   updated_at: string | null;
 };
 
+export function isVendorApplicationEditable(status?: VendorApplicationStatus) {
+  return !status || status === 'draft' || status === 'needs_more_info';
+}
+
+export function isVendorApplicationLocked(status?: VendorApplicationStatus) {
+  return !isVendorApplicationEditable(status);
+}
+
 function createDemoId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -399,7 +407,13 @@ export async function loadVendorOnboardingDraft(): Promise<VendorOnboardingDraft
 export async function saveVendorOnboardingDraft(patch: VendorOnboardingDraftPatch): Promise<VendorOnboardingDraft> {
   requireSession();
   await ensureProfileRow();
-  const draft = mergeDraft(await loadVendorOnboardingDraft(), patch);
+  const currentDraft = await loadVendorOnboardingDraft();
+  if (isVendorApplicationLocked(currentDraft.applicationStatus)) {
+    useVendorOnboardingStore.getState().setDraft(currentDraft);
+    return currentDraft;
+  }
+
+  const draft = mergeDraft(currentDraft, patch);
 
   if (!isSupabaseConfigured || !supabase) {
     useDemoDataStore.getState().saveOnboardingDraft(draft);
@@ -434,6 +448,12 @@ export async function submitVendorOnboarding(patch?: VendorOnboardingDraftPatch)
   await ensureProfileRow();
 
   const localDraft = useVendorOnboardingStore.getState().draft;
+  const currentDraft = localDraft ?? await loadVendorOnboardingDraft();
+  if (isVendorApplicationLocked(currentDraft.applicationStatus)) {
+    useVendorOnboardingStore.getState().setDraft(currentDraft);
+    return currentDraft;
+  }
+
   let baseDraft: VendorOnboardingDraft;
   if (patch) {
     baseDraft = await saveVendorOnboardingDraft(patch);

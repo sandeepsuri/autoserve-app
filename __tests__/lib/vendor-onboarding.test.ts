@@ -12,12 +12,14 @@ jest.mock('@/store/useDemoDataStore', () => ({
 }));
 
 import {
+  isVendorApplicationEditable,
   loadVendorOnboardingDraft,
   saveVendorOnboardingDraft,
   submitVendorOnboarding,
 } from '@/lib/vendor-onboarding';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
+import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 
 const mockAuthGetState = useAuthStore.getState as jest.Mock;
 const mockDemoGetState = useDemoDataStore.getState as jest.Mock;
@@ -57,7 +59,7 @@ const demoState = {
     },
   ],
   onboardingDrafts: [] as Array<{ ownerId: string }>,
-  vendorApplications: [] as Array<{ ownerId: string; status: string }>,
+  vendorApplications: [] as any[],
   addOrUpdateProfile: jest.fn(),
   addVehicle: jest.fn(),
   addBooking: jest.fn(),
@@ -89,6 +91,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   demoState.onboardingDrafts = [];
   demoState.vendorApplications = [];
+  useVendorOnboardingStore.getState().reset();
   mockAuthGetState.mockReturnValue({
     session: { userId: 'vendor-owner-1', email: 'riverside@autoserve.app' },
     profile: {
@@ -105,6 +108,14 @@ beforeEach(() => {
 });
 
 describe('vendor onboarding draft service', () => {
+  it('treats only draft and needs_more_info applications as editable', () => {
+    expect(isVendorApplicationEditable(undefined)).toBe(true);
+    expect(isVendorApplicationEditable('draft')).toBe(true);
+    expect(isVendorApplicationEditable('needs_more_info')).toBe(true);
+    expect(isVendorApplicationEditable('submitted')).toBe(false);
+    expect(isVendorApplicationEditable('under_review')).toBe(false);
+  });
+
   it('derives a draft from existing vendor and service state when no saved draft exists', async () => {
     const draft = await loadVendorOnboardingDraft();
 
@@ -199,5 +210,49 @@ describe('vendor onboarding draft service', () => {
     expect(demoState.addOrUpdateProfile).not.toHaveBeenCalled();
     expect(demoState.upsertVendor).not.toHaveBeenCalled();
     expect(mockSetSessionData).not.toHaveBeenCalled();
+  });
+
+  it('does not resubmit or save a locked submitted application', async () => {
+    demoState.vendorApplications = [
+      {
+        id: 'application-1',
+        ownerId: 'vendor-owner-1',
+        status: 'submitted',
+        businessType: 'shop',
+        profile: {
+          businessName: 'Riverside Garage',
+          description: 'General repair and maintenance.',
+          contactName: 'Alex Rivers',
+          contactEmail: 'riverside@autoserve.app',
+          contactPhone: '+1 310 555 0101',
+        },
+        location: {
+          mode: 'hybrid',
+          address: '482 Riverside Way',
+          coordinates: { latitude: 34.0522, longitude: -118.2437 },
+          serviceRadiusMiles: 30,
+        },
+        services: [
+          {
+            id: 'service-1',
+            title: 'Brake Check',
+            category: 'brakes',
+            description: 'Inspection and recommendations.',
+            durationMinutes: 40,
+            price: 55,
+            active: true,
+          },
+        ],
+        submittedAt: '2026-06-23T00:00:00.000Z',
+        updatedAt: '2026-06-23T00:00:00.000Z',
+      },
+    ];
+
+    const draft = await submitVendorOnboarding();
+
+    expect(draft.applicationStatus).toBe('submitted');
+    expect(draft.submittedAt).toBe('2026-06-23T00:00:00.000Z');
+    expect(demoState.saveOnboardingDraft).not.toHaveBeenCalled();
+    expect(demoState.saveVendorApplication).not.toHaveBeenCalled();
   });
 });

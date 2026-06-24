@@ -11,73 +11,17 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import { subscribeBookingChanges } from '@/lib/bookings-realtime';
 import { queryClient } from '@/lib/query-client';
+import { getRouteGateRedirect } from '@/lib/route-gate';
 import { initAuthListener, useAuthStore } from '@/store/useAuthStore';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 function RouteGate() {
   const segments = useSegments();
-  const { session, profile, loading, guestMode } = useAuthStore();
+  const { session, profile, loading, guestMode, postAuthPath } = useAuthStore();
 
-  if (loading) return null;
-
-  const rootSegment = segments[0] ?? '(public)';
-  const inAuth = rootSegment === '(auth)';
-  const inVendor = rootSegment === '(vendor)';
-  const inClient = rootSegment === '(client)';
-  const inPublic = rootSegment === '(public)';
-  const routeName = segments[1];
-
-  if (inPublic && routeName === 'welcome' && session && profile?.role === 'client') {
-    return <Redirect href="/(client)" />;
-  }
-
-  if (inPublic && routeName === 'welcome' && session && profile?.role === 'vendor') {
-    return <Redirect href={profile.businessType ? '/(vendor)' : '/(auth)/vendor-onboarding'} />;
-  }
-
-  if (inAuth && session && profile?.role === 'vendor') {
-    const onboardingDone = Boolean(profile.businessType);
-    const inOnboarding = segments[1] === 'vendor-onboarding' || segments[1] === 'vendor-setup';
-    if (!onboardingDone && !inOnboarding) {
-      return <Redirect href="/(auth)/vendor-onboarding" />;
-    }
-    if (onboardingDone && !inOnboarding) {
-      return <Redirect href="/(vendor)" />;
-    }
-  }
-
-  if (inAuth && session && profile?.role === 'client') {
-    return <Redirect href="/(client)" />;
-  }
-
-  if (session && !profile?.role && !inAuth) {
-    return <Redirect href="/(auth)/role" />;
-  }
-
-  if (inAuth && segments[1] === 'role' && !session) {
-    return <Redirect href="/(auth)" />;
-  }
-
-  if (inVendor && session && profile?.role === 'vendor' && !profile.businessType) {
-    return <Redirect href="/(auth)/vendor-onboarding" />;
-  }
-
-  if (inVendor && (!session || profile?.role !== 'vendor')) {
-    return <Redirect href="/(auth)" />;
-  }
-
-  if (inClient && session && profile?.role === 'vendor') {
-    return <Redirect href="/(vendor)" />;
-  }
-
-  if (inClient && !session && !guestMode) {
-    return <Redirect href="/(auth)" />;
-  }
-
-  if (!inPublic && !inAuth && !inClient && !inVendor) {
-    return <Redirect href="/(public)/welcome" />;
-  }
+  const redirect = getRouteGateRedirect({ segments, session, profile, loading, guestMode, postAuthPath });
+  if (redirect) return <Redirect href={redirect as never} />;
 
   return null;
 }

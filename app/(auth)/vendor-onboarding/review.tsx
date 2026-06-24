@@ -1,17 +1,22 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/AppCard';
 import { OnboardingStepShell } from '@/components/onboarding/OnboardingStepShell';
 import { colors, radius, spacing, typography } from '@/constants/theme';
-import { submitVendorOnboarding } from '@/lib/vendor-onboarding';
+import {
+  isVendorApplicationLocked,
+  loadVendorOnboardingDraft,
+  submitVendorOnboarding,
+} from '@/lib/vendor-onboarding';
 import {
   BUSINESS_TYPE_LABELS,
   getStep,
   isDraftReadyFor,
   LOCATION_MODE_LABELS,
 } from '@/lib/vendor-onboarding-steps';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 import {
   countWeeklySlots,
@@ -33,14 +38,69 @@ const CATEGORY_LABELS: Record<ServiceCategory, string> = {
   tint: 'Tint',
 };
 
+const APPLICATION_STATUS_COPY = {
+  submitted: {
+    title: 'Application submitted',
+    body: 'Your application is pending admin review. You can review the details here, but edits are locked unless an admin requests more information.',
+  },
+  under_review: {
+    title: 'Application under review',
+    body: 'An AutoServe admin is reviewing your application. Edits are locked unless more information is requested.',
+  },
+  approved: {
+    title: 'Application approved',
+    body: 'Your vendor account has been approved.',
+  },
+  rejected: {
+    title: 'Application rejected',
+    body: 'This application is no longer editable. Contact AutoServe support if you need help.',
+  },
+  suspended: {
+    title: 'Application suspended',
+    body: 'This application is no longer editable. Contact AutoServe support if you need help.',
+  },
+} as const;
+
 export default function ReviewStep() {
   const router = useRouter();
-  const { draft } = useVendorOnboardingStore();
+  const { draft, setDraft, reset } = useVendorOnboardingStore();
   const { availability } = useVendorAvailabilityStore();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
-  const canSubmit = isDraftReadyFor('review', draft) && !submitting;
+  useEffect(() => {
+    const session = useAuthStore.getState().session;
+    const isStale = Boolean(draft && session && draft.ownerId !== session.userId);
+    if (isStale) reset();
+
+    loadVendorOnboardingDraft()
+      .then(setDraft)
+      .catch(() => {
+        if (draft && !isStale) return;
+        const { session, profile } = useAuthStore.getState();
+        if (!session) return;
+        setDraft({
+          ownerId: session.userId,
+          businessType: profile?.businessType,
+          profile: {
+            contactName: profile?.fullName,
+            contactEmail: profile?.email,
+            contactPhone: profile?.phone,
+          },
+          location: {},
+          services: [],
+          completed: false,
+        });
+      })
+      .finally(() => setReady(true));
+  }, []);
+
+  const isLocked = isVendorApplicationLocked(draft?.applicationStatus);
+  const canSubmit = isDraftReadyFor('review', draft) && !submitting && !isLocked;
+  const statusCopy = draft?.applicationStatus && draft.applicationStatus in APPLICATION_STATUS_COPY
+    ? APPLICATION_STATUS_COPY[draft.applicationStatus as keyof typeof APPLICATION_STATUS_COPY]
+    : null;
   const services = useMemo(() => draft?.services ?? [], [draft?.services]);
   const activeServices = useMemo(() => services.filter((s) => s.active ?? true), [services]);
   const hiddenServices = useMemo(() => services.filter((s) => !(s.active ?? true)), [services]);
@@ -55,6 +115,11 @@ export default function ReviewStep() {
   }, [services]);
 
   const handleSubmit = async () => {
+    if (isLocked) {
+      router.replace('/(auth)/vendor-onboarding/complete');
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -69,6 +134,7 @@ export default function ReviewStep() {
   };
 
   const editSection = (stepId: 'account-type' | 'business-info' | 'location' | 'services' | 'availability') => {
+    if (isLocked) return;
     router.push(getStep(stepId).route);
   };
 
@@ -84,15 +150,32 @@ export default function ReviewStep() {
       </View>
     ) : null;
 
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgBase }}>
+        <ActivityIndicator color={colors.surfaceBrand} />
+      </View>
+    );
+  }
+
   return (
     <OnboardingStepShell
       stepId="review"
-      title="Review your setup"
-      subtitle="Check your details before finishing."
-      canContinue={canSubmit}
+      title={isLocked ? 'Review application' : 'Review your setup'}
+      subtitle={isLocked ? 'Your submitted details are shown below.' : 'Check your details before finishing.'}
+      canContinue={isLocked || canSubmit}
       onContinue={handleSubmit}
-      continueLabel={submitting ? 'Finishing…' : 'Finish setup'}
+      continueLabel={isLocked ? 'Back to status' : submitting ? 'Finishing…' : 'Finish setup'}
+      secondaryLabel={isLocked ? 'Return to client home' : 'Save & exit'}
+      onSecondary={isLocked ? () => router.replace('/(client)') : undefined}
     >
+      {statusCopy ? (
+        <View style={styles.statusBanner}>
+          <Text style={styles.statusBannerTitle}>{statusCopy.title}</Text>
+          <Text style={styles.statusBannerText}>{statusCopy.body}</Text>
+        </View>
+      ) : null}
+
       {submitError ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{submitError}</Text>
@@ -100,7 +183,7 @@ export default function ReviewStep() {
       ) : null}
 
       <AppCard style={styles.card}>
-        <SectionEditRow title="Account" onEdit={() => editSection('business-info')} />
+        <SectionEditRow title="Account" editable={!isLocked} onEdit={() => editSection('business-info')} />
         {row('Type', draft?.businessType ? BUSINESS_TYPE_LABELS[draft.businessType] : undefined)}
         {row('Business name', draft?.profile?.businessName)}
         {row('Description', draft?.profile?.description)}
@@ -110,7 +193,7 @@ export default function ReviewStep() {
       </AppCard>
 
       <AppCard style={styles.card}>
-        <SectionEditRow title="Location" onEdit={() => editSection('location')} />
+        <SectionEditRow title="Location" editable={!isLocked} onEdit={() => editSection('location')} />
         {row('Mode', draft?.location?.mode ? LOCATION_MODE_LABELS[draft.location.mode] : undefined)}
         {row('Address', draft?.location?.address)}
         {draft?.location?.serviceRadiusMiles
@@ -119,7 +202,7 @@ export default function ReviewStep() {
       </AppCard>
 
       <AppCard style={styles.card}>
-        <SectionEditRow title="Availability" onEdit={() => editSection('availability')} />
+        <SectionEditRow title="Availability" editable={!isLocked} onEdit={() => editSection('availability')} />
         {openDays.length > 0 ? (
           <>
             <View style={styles.row}>
@@ -156,7 +239,7 @@ export default function ReviewStep() {
       </AppCard>
 
       <AppCard style={styles.card}>
-        <SectionEditRow title="Services" onEdit={() => editSection('services')} />
+        <SectionEditRow title="Services" editable={!isLocked} onEdit={() => editSection('services')} />
         {services.length ? (
           <>
             <View style={styles.serviceSummaryRow}>
@@ -205,13 +288,15 @@ export default function ReviewStep() {
   );
 }
 
-function SectionEditRow({ title, onEdit }: { title: string; onEdit: () => void }) {
+function SectionEditRow({ title, editable = true, onEdit }: { title: string; editable?: boolean; onEdit: () => void }) {
   return (
     <View style={sectionStyles.row}>
       <Text style={typography.titleSm}>{title}</Text>
-      <Pressable onPress={onEdit} style={sectionStyles.editButton} hitSlop={8}>
-        <Text style={sectionStyles.editLabel}>Edit</Text>
-      </Pressable>
+      {editable ? (
+        <Pressable onPress={onEdit} style={sectionStyles.editButton} hitSlop={8}>
+          <Text style={sectionStyles.editLabel}>Edit</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -244,6 +329,22 @@ const styles = StyleSheet.create({
   errorText: {
     ...typography.bodyMd,
     color: colors.pending,
+  },
+  statusBanner: {
+    backgroundColor: colors.bgElevated,
+    borderColor: colors.borderDefault,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: spacing.xs,
+    padding: spacing.md,
+  },
+  statusBannerTitle: {
+    ...typography.labelLg,
+    color: colors.textPrimary,
+  },
+  statusBannerText: {
+    ...typography.bodyMd,
+    color: colors.textSecondary,
   },
   row: {
     flexDirection: 'row',
