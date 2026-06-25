@@ -179,6 +179,39 @@ const makeChain = (overrides: Record<string, unknown> = {}) => {
   return chain;
 };
 
+// ─── ticket 06: discovery only exposes active vendors ──────────────────────────
+
+describe('active-vendor gating (ticket 06)', () => {
+  it('listVendors only requests active vendors (is_active = true)', async () => {
+    const eq = jest.fn().mockResolvedValue({ data: [], error: null });
+    mockFrom.mockReturnValue({ select: jest.fn().mockReturnValue({ eq }) });
+    await listVendors();
+    expect(mockFrom).toHaveBeenCalledWith('vendors');
+    expect(eq).toHaveBeenCalledWith('is_active', true);
+  });
+
+  it('getVendorDetail only fetches an active vendor by id (is_active = true)', async () => {
+    const eqIsActive = jest.fn().mockReturnValue({
+      maybeSingle: jest.fn().mockResolvedValue({ data: null }),
+    });
+    const eqId = jest.fn().mockReturnValue({ eq: eqIsActive });
+
+    let call = 0;
+    mockFrom.mockImplementation(() => {
+      call++;
+      if (call === 1) return { select: jest.fn().mockReturnValue({ eq: eqId }) };
+      if (call === 2) {
+        return makeChain({ eq: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ data: [] }) }) });
+      }
+      return makeChain({ eq: jest.fn().mockReturnValue({ order: jest.fn().mockResolvedValue({ data: [] }) }) });
+    });
+
+    await getVendorDetail('v1');
+    expect(eqId).toHaveBeenCalledWith('id', 'v1');
+    expect(eqIsActive).toHaveBeenCalledWith('is_active', true);
+  });
+});
+
 describe('getVendorDetail', () => {
   it('returns vendor null when supabase row not found', async () => {
     mockFrom.mockImplementation(() =>

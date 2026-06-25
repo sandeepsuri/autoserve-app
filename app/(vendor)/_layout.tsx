@@ -12,12 +12,12 @@ export default function VendorLayout() {
   const setVendorCapability = useAuthStore((s) => s.setVendorCapability);
 
   useEffect(() => {
-    // Safety net: the group guard enforces the capability gate at the layout
-    // boundary, so this only refreshes a stale/missing capability right
-    // after approval rather than refetching on every mount (profiles.role
-    // never becomes 'vendor' under Option B).
+    // Vendor access is gated by post-auth routing (lib/post-auth-destination)
+    // + backend RLS, not a continuous route guard. This effect only refreshes
+    // a stale/missing capability right after approval rather than refetching
+    // on every mount (profiles.role never becomes 'vendor' under Option B).
     //
-    // This depends only on the primitive `hasActiveVendor` boolean (not the
+    // It depends only on the primitive `hasActiveVendor` boolean (not the
     // whole vendorCapability object), and useAuthStore.setVendorCapability
     // is itself a no-op when the next value is equal to the current one —
     // both guard against this effect re-firing/re-setting on every render
