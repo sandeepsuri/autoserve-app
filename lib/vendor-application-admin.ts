@@ -71,6 +71,23 @@ export async function requestVendorApplicationInfo(
   return mapApplicationRow(data);
 }
 
+export async function suspendVendorApplication(
+  applicationId: string,
+  reason: string,
+): Promise<VendorApplication> {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Suspending an application requires a configured Supabase project');
+  }
+
+  const { data, error } = await supabase.rpc('suspend_vendor_application', {
+    p_application_id: applicationId,
+    p_reason: reason,
+  });
+
+  if (error) throw error;
+  return mapApplicationRow(data);
+}
+
 function mapApplicationRow(row: Record<string, unknown>): VendorApplication {
   return {
     id: row.id as string,

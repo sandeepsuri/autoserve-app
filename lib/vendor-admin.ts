@@ -21,6 +21,7 @@ export async function getVendorForOwner(): Promise<VendorSummary | null> {
     .from('vendors')
     .select('*')
     .eq('owner_id', ownerId)
+    .eq('is_active', true)
     .maybeSingle();
 
   if (error || !data) return null;
