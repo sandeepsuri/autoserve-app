@@ -8,6 +8,7 @@ import { AppSession, BusinessType, UserProfile, UserRole } from '@/types/domain'
 import { setSigningIn } from '@/store/useAuthStore';
 
 import { isSupabaseConfigured, supabase } from './supabase';
+import { loadVendorCapability } from './vendor-capability';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -79,6 +80,8 @@ export async function signIn(email: string, password: string) {
     const session = makeDemoSession(email);
     const profile = await loadProfileForUser(session.userId, session.email);
     useAuthStore.getState().setSessionData(session, profile);
+    const capability = await loadVendorCapability();
+    useAuthStore.getState().setVendorCapability(capability);
     return { session, profile };
   }
 
@@ -87,6 +90,8 @@ export async function signIn(email: string, password: string) {
   const session = { userId: data.user.id, email: data.user.email ?? email };
   const profile = await loadProfileForUser(session.userId, session.email);
   useAuthStore.getState().setSessionData(session, profile);
+  const capability = await loadVendorCapability();
+  useAuthStore.getState().setVendorCapability(capability);
   return { session, profile };
 }
 
@@ -96,6 +101,8 @@ export async function signUp(email: string, password: string, fullName: string) 
     const profile = { id: session.userId, email, fullName };
     await persistProfile(profile);
     useAuthStore.getState().setSessionData(session, profile);
+    const capability = await loadVendorCapability();
+    useAuthStore.getState().setVendorCapability(capability);
     return { session, profile };
   }
 
@@ -113,6 +120,8 @@ export async function signUp(email: string, password: string, fullName: string) 
   if (session && profile) {
     await persistProfile(profile);
     useAuthStore.getState().setSessionData(session, profile);
+    const capability = await loadVendorCapability();
+    useAuthStore.getState().setVendorCapability(capability);
   }
   return { session, profile, needsConfirmation: !hasSession };
 }
@@ -123,6 +132,8 @@ export async function signInWithGoogle() {
     const profile = { id: session.userId, email: session.email, fullName: 'Google Driver' };
     await persistProfile(profile);
     useAuthStore.getState().setSessionData(session, profile);
+    const capability = await loadVendorCapability();
+    useAuthStore.getState().setVendorCapability(capability);
     return true;
   }
 
@@ -167,6 +178,8 @@ export async function signInWithGoogle() {
     const profile = await loadProfileForUser(session.userId, session.email).catch(() => null);
 
     useAuthStore.getState().setSessionData(session, profile);
+    const capability = await loadVendorCapability().catch(() => null);
+    useAuthStore.getState().setVendorCapability(capability);
     return true;
   } finally {
     setSigningIn(false);

@@ -10,11 +10,13 @@ let mockVendors: import('@/types/domain').VendorSummary[] = [];
 let mockAuthState: {
   session: { userId: string; email: string } | null;
   profile: { role: 'client' | 'vendor' } | null;
+  vendorCapability: { hasActiveVendor: boolean } | null;
   guestMode: boolean;
   guestClientId: string | null;
 } = {
   session: { userId: 'client-1', email: 'client@example.com' },
   profile: { role: 'client' as const },
+  vendorCapability: null,
   guestMode: false,
   guestClientId: null as string | null,
 };
@@ -107,6 +109,7 @@ beforeEach(() => {
   mockAuthState = {
     session: { userId: 'client-1', email: 'client@example.com' },
     profile: { role: 'client' },
+    vendorCapability: null,
     guestMode: false,
     guestClientId: null,
   };
@@ -251,8 +254,62 @@ describe('listBookingsForCurrentUser', () => {
     mockAuthState = {
       session: null,
       profile: null,
+      vendorCapability: null,
       guestMode: true,
       guestClientId: 'guest-1',
+    };
+
+    await expect(listBookingsForCurrentUser()).resolves.toEqual([mockBookings[0]]);
+  });
+
+  it('returns vendor-owned bookings (not client-id bookings) for an approved-active vendor capability', async () => {
+    mockBookings = [
+      makeRecord({ id: 'b1', vendorId: 'v1' }),
+      makeRecord({ id: 'b2', vendorId: 'v2' }),
+    ];
+    mockVendors = [
+      {
+        id: 'v1',
+        ownerId: 'vendor-owner-1',
+        businessType: 'shop',
+        name: 'Riverside Auto',
+        description: 'desc',
+        address: '123 Main',
+        distanceMiles: 0,
+        rating: 5,
+        reviewCount: 1,
+        mobileServiceEnabled: false,
+        serviceRadiusMiles: 0,
+        nextAvailable: 'Soon',
+        heroImage: 'img',
+        serviceCategories: ['oil'],
+        coordinates: { latitude: 0, longitude: 0 },
+      },
+    ];
+    mockAuthState = {
+      session: { userId: 'vendor-owner-1', email: 'vendor@example.com' },
+      // profiles.role stays 'client' under Option B even for approved
+      // vendors — only vendorCapability.hasActiveVendor should gate this.
+      profile: { role: 'client' },
+      vendorCapability: { hasActiveVendor: true },
+      guestMode: false,
+      guestClientId: null,
+    };
+
+    await expect(listBookingsForCurrentUser()).resolves.toEqual([mockBookings[0]]);
+  });
+
+  it('returns client-id bookings (not vendor-owned bookings) when capability has no active vendor', async () => {
+    mockBookings = [
+      makeRecord({ id: 'b1', clientId: 'client-1' }),
+      makeRecord({ id: 'b2', vendorId: 'v1', clientId: 'someone-else' }),
+    ];
+    mockAuthState = {
+      session: { userId: 'client-1', email: 'client@example.com' },
+      profile: { role: 'client' },
+      vendorCapability: { hasActiveVendor: false },
+      guestMode: false,
+      guestClientId: null,
     };
 
     await expect(listBookingsForCurrentUser()).resolves.toEqual([mockBookings[0]]);
@@ -264,6 +321,7 @@ describe('listBookingsForVendorOwner', () => {
     mockAuthState = {
       session: { userId: 'vendor-owner-1', email: 'vendor@example.com' },
       profile: { role: 'vendor' },
+      vendorCapability: { hasActiveVendor: true },
       guestMode: false,
       guestClientId: null,
     };
@@ -315,6 +373,7 @@ describe('listBookingsForVendorOwner', () => {
     mockAuthState = {
       session: { userId: 'vendor-owner-1', email: 'vendor@example.com' },
       profile: { role: 'vendor' },
+      vendorCapability: { hasActiveVendor: true },
       guestMode: false,
       guestClientId: null,
     };

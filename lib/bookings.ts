@@ -82,7 +82,7 @@ function rowToRecord(item: Record<string, unknown>): BookingRecord {
 // ─── List ─────────────────────────────────────────────────────────────────────
 
 export async function listBookingsForCurrentUser(): Promise<BookingRecord[]> {
-  const { session, profile, guestMode, guestClientId } = useAuthStore.getState();
+  const { session, guestMode, guestClientId } = useAuthStore.getState();
 
   if (!session) {
     if (guestMode && guestClientId) {
@@ -91,7 +91,7 @@ export async function listBookingsForCurrentUser(): Promise<BookingRecord[]> {
     return [];
   }
 
-  const isVendor = profile?.role === 'vendor';
+  const isVendor = useAuthStore.getState().vendorCapability?.hasActiveVendor === true;
 
   if (!isSupabaseConfigured || !supabase) {
     return isVendor
@@ -276,7 +276,7 @@ export async function updateBookingStatus(bookingId: string, status: BookingReco
     return getBookingByIdFromStore(bookingId);
   }
 
-  const isVendor = useAuthStore.getState().profile?.role === 'vendor';
+  const isVendor = useAuthStore.getState().vendorCapability?.hasActiveVendor === true;
 
   if (isVendor) {
     const { data, error } = await supabase.rpc('update_booking_status_as_vendor', {

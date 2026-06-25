@@ -3,21 +3,31 @@ import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
 
 import { colors } from '@/constants/theme';
-import { loadProfileForUser } from '@/lib/auth';
+import { loadVendorCapability } from '@/lib/vendor-capability';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export default function VendorLayout() {
   const session = useAuthStore((s) => s.session);
-  const profile = useAuthStore((s) => s.profile);
-  const setSessionData = useAuthStore((s) => s.setSessionData);
+  const vendorCapability = useAuthStore((s) => s.vendorCapability);
+  const setVendorCapability = useAuthStore((s) => s.setVendorCapability);
 
   useEffect(() => {
-    if (session && profile?.role !== 'vendor') {
-      loadProfileForUser(session.userId, session.email).then((fresh) => {
-        if (fresh) setSessionData(session, fresh);
+    // Safety net: the group guard enforces the capability gate at the layout
+    // boundary, so this only refreshes a stale/missing capability right
+    // after approval rather than refetching on every mount (profiles.role
+    // never becomes 'vendor' under Option B).
+    //
+    // This depends only on the primitive `hasActiveVendor` boolean (not the
+    // whole vendorCapability object), and useAuthStore.setVendorCapability
+    // is itself a no-op when the next value is equal to the current one —
+    // both guard against this effect re-firing/re-setting on every render
+    // from object-identity churn alone.
+    if (session && !vendorCapability?.hasActiveVendor) {
+      loadVendorCapability().then((fresh) => {
+        if (fresh.hasActiveVendor) setVendorCapability(fresh);
       });
     }
-  }, [session, profile?.role, setSessionData]);
+  }, [session, vendorCapability?.hasActiveVendor, setVendorCapability]);
 
   return (
     <Tabs

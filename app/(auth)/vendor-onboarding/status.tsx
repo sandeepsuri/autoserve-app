@@ -1,0 +1,95 @@
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
+
+import { AppButton } from '@/components/AppButton';
+import { AppHeader } from '@/components/AppHeader';
+import { Screen } from '@/components/Screen';
+import { ApplicationStatusScreen, ApplicationStatusScreenStatus } from '@/components/onboarding/ApplicationStatusScreen';
+import { colors } from '@/constants/theme';
+import { shouldShowVendorApplicationStatus } from '@/lib/post-auth-destination';
+import { loadVendorCapability } from '@/lib/vendor-capability';
+import { loadVendorOnboardingDraft } from '@/lib/vendor-onboarding';
+import { useAuthStore } from '@/store/useAuthStore';
+import type { VendorApplicationStatus, VendorOnboardingDraft } from '@/types/domain';
+
+const SUMMARY_STATUSES: VendorApplicationStatus[] = ['submitted', 'under_review'];
+
+export default function VendorApplicationStatusScreen() {
+  const router = useRouter();
+  const session = useAuthStore((s) => s.session);
+  const vendorCapability = useAuthStore((s) => s.vendorCapability);
+  const setVendorCapability = useAuthStore((s) => s.setVendorCapability);
+  const [capabilityLoading, setCapabilityLoading] = useState(false);
+  const [draft, setDraft] = useState<VendorOnboardingDraft | null>(null);
+
+  const status = vendorCapability?.applicationStatus;
+  const isRenderableStatus = shouldShowVendorApplicationStatus(status);
+
+  useEffect(() => {
+    if (!session || vendorCapability || capabilityLoading) return;
+
+    let cancelled = false;
+    setCapabilityLoading(true);
+    loadVendorCapability()
+      .then((capability) => {
+        if (!cancelled) setVendorCapability(capability);
+      })
+      .catch(() => {
+        if (!cancelled) setVendorCapability({ hasActiveVendor: false });
+      })
+      .finally(() => {
+        if (!cancelled) setCapabilityLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [capabilityLoading, session, setVendorCapability, vendorCapability]);
+
+  useEffect(() => {
+    if (!status || !SUMMARY_STATUSES.includes(status)) {
+      setDraft(null);
+      return;
+    }
+
+    let cancelled = false;
+    loadVendorOnboardingDraft()
+      .then((loadedDraft) => {
+        if (!cancelled) setDraft(loadedDraft);
+      })
+      .catch(() => {
+        if (!cancelled) setDraft(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
+  if (session && !vendorCapability) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgBase }}>
+        <ActivityIndicator color={colors.surfaceBrand} />
+      </View>
+    );
+  }
+
+  if (!isRenderableStatus) {
+    return (
+      <Screen>
+        <AppHeader
+          title="No active application status"
+          subtitle="We could not find a vendor application status that needs review."
+          fallbackHref="/(client)"
+        />
+        <Text style={{ color: colors.textSecondary }}>
+          Return to your client home, or apply as a vendor again if you need to submit a new application.
+        </Text>
+        <AppButton label="Return to client home" onPress={() => router.replace('/(client)')} />
+      </Screen>
+    );
+  }
+
+  return <ApplicationStatusScreen status={status as ApplicationStatusScreenStatus} draft={draft} />;
+}

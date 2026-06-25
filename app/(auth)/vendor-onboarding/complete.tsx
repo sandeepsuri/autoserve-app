@@ -13,7 +13,7 @@ import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 export default function VendorOnboardingComplete() {
   const router = useRouter();
   const { draft, reset } = useVendorOnboardingStore();
-  const profile = useAuthStore((s) => s.profile);
+  const vendorCapability = useAuthStore((s) => s.vendorCapability);
 
   const snapshotRef = useRef({
     businessName: draft?.profile?.businessName,
@@ -35,13 +35,13 @@ export default function VendorOnboardingComplete() {
     snapshot.applicationStatus === 'submitted' ||
     snapshot.applicationStatus === 'under_review' ||
     snapshot.applicationStatus === 'needs_more_info' ||
-    (profile?.role === 'vendor' && Boolean(profile.businessType));
+    Boolean(vendorCapability?.hasActiveVendor);
 
   if (!isSubmitted) {
     return <Redirect href="/(auth)/vendor-onboarding" />;
   }
 
-  const isApprovedVendor = profile?.role === 'vendor' && Boolean(profile.businessType);
+  const isApprovedVendor = Boolean(vendorCapability?.hasActiveVendor);
 
   return (
     <SafeAreaView style={styles.safe}>

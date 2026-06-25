@@ -4,17 +4,26 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { hydrateSupabaseSession, loadProfileForUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { loadVendorCapability, VendorCapability } from '@/lib/vendor-capability';
 import { AppSession, UserProfile } from '@/types/domain';
+
+function vendorCapabilityEquals(a: VendorCapability | null, b: VendorCapability | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.hasActiveVendor === b.hasActiveVendor && a.applicationStatus === b.applicationStatus;
+}
 
 interface AuthState {
   session: AppSession | null;
   profile: UserProfile | null;
+  vendorCapability: VendorCapability | null;
   loading: boolean;
   guestMode: boolean;
   guestClientId: string | null;
   postAuthPath: string | null;
   setGuestMode: (enabled: boolean) => void;
   setSessionData: (session: AppSession | null, profile: UserProfile | null) => void;
+  setVendorCapability: (capability: VendorCapability | null) => void;
   setLoading: (loading: boolean) => void;
   setPostAuthPath: (path: string | null) => void;
   clearAuth: () => void;
@@ -25,6 +34,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       session: null,
       profile: null,
+      vendorCapability: null,
       loading: true,
       guestMode: false,
       guestClientId: null,
@@ -42,10 +52,24 @@ export const useAuthStore = create<AuthState>()(
       setSessionData: (session, profile) =>
         set(session
           ? { session, profile, loading: false, guestMode: false, guestClientId: null }
-          : { session: null, profile: null, loading: false }),
+          : { session: null, profile: null, loading: false, vendorCapability: null }),
+      setVendorCapability: (capability) =>
+        set((state) => {
+          // Skip the update when the value is unchanged: storing a
+          // brand-new object with identical booleans/status every call
+          // still produces a new reference, which re-triggers any selector
+          // subscribed to `vendorCapability` (e.g. (vendor)/_layout.tsx's
+          // refresh effect) — that re-render-then-refetch cycle is what
+          // turned a transient capability mismatch into an infinite loop.
+          if (vendorCapabilityEquals(state.vendorCapability, capability)) {
+            return state;
+          }
+          return { vendorCapability: capability };
+        }),
       setLoading: (loading) => set({ loading }),
       setPostAuthPath: (path) => set({ postAuthPath: path }),
-      clearAuth: () => set({ session: null, profile: null, guestMode: false, postAuthPath: null, loading: false }),
+      clearAuth: () =>
+        set({ session: null, profile: null, vendorCapability: null, guestMode: false, postAuthPath: null, loading: false }),
     }),
     {
       name: 'autoserve-auth',
@@ -53,6 +77,9 @@ export const useAuthStore = create<AuthState>()(
       // session is intentionally excluded — Supabase's own AsyncStorage is the
       // authoritative JWT store. Persisting session here too causes drift when
       // clearAuth/signOut doesn't perfectly sync both stores.
+      // vendorCapability is intentionally excluded too — it is server-derived
+      // and must never go stale across app restarts; it is always reloaded
+      // alongside the profile (initAuthListener, signIn/signUp/signInWithGoogle).
       partialize: (state) => ({
         profile: state.profile,
         guestMode: state.guestMode,
@@ -81,6 +108,8 @@ export async function initAuthListener() {
   } else {
     const profile = await loadProfileForUser(session.userId, session.email);
     useAuthStore.getState().setSessionData(session, profile);
+    const capability = await loadVendorCapability();
+    useAuthStore.getState().setVendorCapability(capability);
   }
 
   // Keep Zustand's in-memory session in sync with the Supabase JWT for the
@@ -102,6 +131,8 @@ export async function initAuthListener() {
         if (!signingIn && existing?.userId !== nextSession.userId) {
           const profile = await loadProfileForUser(nextSession.userId, nextSession.email);
           useAuthStore.getState().setSessionData(nextSession, profile);
+          const capability = await loadVendorCapability();
+          useAuthStore.getState().setVendorCapability(capability);
         } else {
           useAuthStore.getState().setSessionData(nextSession, useAuthStore.getState().profile);
         }
