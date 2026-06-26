@@ -19,6 +19,7 @@ export type VendorOnboardingStepId =
   | 'location'
   | 'services'
   | 'availability'
+  | 'documents'
   | 'review';
 
 export interface VendorOnboardingStep {
@@ -34,7 +35,8 @@ export const VENDOR_ONBOARDING_STEPS: VendorOnboardingStep[] = [
   { id: 'location', route: '/(auth)/vendor-onboarding/location', label: 'Location', index: 2 },
   { id: 'services', route: '/(auth)/vendor-onboarding/services', label: 'Services', index: 3 },
   { id: 'availability', route: '/(auth)/vendor-onboarding/availability' as Href, label: 'Availability', index: 4 },
-  { id: 'review', route: '/(auth)/vendor-onboarding/review', label: 'Review', index: 5 },
+  { id: 'documents', route: '/(auth)/vendor-onboarding/documents' as Href, label: 'Documents', index: 5 },
+  { id: 'review', route: '/(auth)/vendor-onboarding/review', label: 'Review', index: 6 },
 ];
 
 export function getStep(id: VendorOnboardingStepId): VendorOnboardingStep {
@@ -77,6 +79,8 @@ export function isDraftReadyFor(id: VendorOnboardingStepId, draft: VendorOnboard
       return hasValidService;
     case 'availability':
       return hasValidService; // availability step requires services to be done first
+    case 'documents':
+      return true; // verification documents are optional at submission time
     case 'review':
       return Boolean(draft.businessType) && Boolean(draft.profile?.businessName?.trim()) && hasValidService;
   }

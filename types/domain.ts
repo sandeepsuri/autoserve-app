@@ -139,6 +139,21 @@ export interface VendorApplication {
   updatedAt?: string;
 }
 
+export type VerificationDocumentType = 'license' | 'insurance' | 'id' | 'proof_of_address' | 'other';
+export type VerificationDocumentReviewStatus = 'pending' | 'accepted' | 'rejected';
+
+export interface VerificationDocument {
+  id: string;
+  applicationId: string;
+  ownerId: string;
+  documentType: VerificationDocumentType;
+  storagePath: string;
+  reviewStatus: VerificationDocumentReviewStatus;
+  reviewerNotes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface VendorOnboardingDraftPatch {
   businessType?: BusinessType;
   profile?: Partial<VendorOnboardingProfileDraft>;
