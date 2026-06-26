@@ -35,7 +35,8 @@ describe('vendor approval backend contract', () => {
   });
 
   it('creates vendor services from the submitted application service catalog', () => {
-    expect(approvalSql).toContain('delete from public.services');
+    expect(approvalSql).not.toContain('delete from public.services');
+    expect(approvalSql).toContain('set active = false');
     expect(approvalSql).toContain('jsonb_array_elements(v_app.service_catalog)');
     expect(approvalSql).toContain("trim(v_service->>'title')");
     expect(approvalSql).toContain("v_service->>'category'");

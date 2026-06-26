@@ -6,6 +6,7 @@ import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { ApplicationSummary } from '@/components/onboarding/ApplicationSummary';
 import { colors, spacing, typography } from '@/constants/theme';
+import { signOut } from '@/lib/auth';
 import type { VendorApplicationStatus, VendorOnboardingDraft } from '@/types/domain';
 
 export type ApplicationStatusScreenStatus = Extract<
@@ -28,7 +29,7 @@ const STATUS_COPY: Record<ApplicationStatusScreenStatus, { title: string; body: 
     title: 'Your application was not approved',
     body: 'Your vendor application was not approved at this time.',
     nextSteps:
-      'If you believe this was a mistake or want more detail, contact AutoServe support. You can keep using AutoServe as a client in the meantime.',
+      'If you believe this was a mistake or want more detail, contact AutoServe support.',
   },
   needs_more_info: {
     title: 'We need more information',
@@ -60,6 +61,11 @@ export function ApplicationStatusScreen({ status, draft }: Props) {
   const copy = STATUS_COPY[status];
   const showSummary = PENDING_REVIEW_STATUSES.includes(status);
 
+  const returnToLogin = async () => {
+    await signOut();
+    router.replace('/(auth)');
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -77,7 +83,7 @@ export function ApplicationStatusScreen({ status, draft }: Props) {
       </ScrollView>
 
       <View style={styles.footer}>
-        <AppButton label="Return to client home" onPress={() => router.replace('/(client)')} />
+        <AppButton label="Return to login" onPress={returnToLogin} />
       </View>
     </SafeAreaView>
   );

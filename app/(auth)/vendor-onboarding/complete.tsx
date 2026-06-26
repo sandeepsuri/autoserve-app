@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { signOut } from '@/lib/auth';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 
 export default function VendorOnboardingComplete() {
@@ -42,6 +43,10 @@ export default function VendorOnboardingComplete() {
   }
 
   const isApprovedVendor = Boolean(vendorCapability?.hasActiveVendor);
+  const returnToLogin = async () => {
+    await signOut();
+    router.replace('/(auth)');
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -83,8 +88,8 @@ export default function VendorOnboardingComplete() {
 
       <View style={styles.footer}>
         <AppButton
-          label={isApprovedVendor ? 'Go to dashboard' : 'Return to client home'}
-          onPress={() => router.replace(isApprovedVendor ? '/(vendor)' : '/(client)')}
+          label={isApprovedVendor ? 'Go to dashboard' : 'Return to login'}
+          onPress={isApprovedVendor ? () => router.replace('/(vendor)') : returnToLogin}
         />
         {!isApprovedVendor ? (
           <AppButton

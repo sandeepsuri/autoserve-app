@@ -7,6 +7,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { Screen } from '@/components/Screen';
 import { ApplicationStatusScreen, ApplicationStatusScreenStatus } from '@/components/onboarding/ApplicationStatusScreen';
 import { colors } from '@/constants/theme';
+import { signOut } from '@/lib/auth';
 import { shouldShowVendorApplicationStatus } from '@/lib/post-auth-destination';
 import { loadVendorCapability } from '@/lib/vendor-capability';
 import { loadVendorOnboardingDraft } from '@/lib/vendor-onboarding';
@@ -76,17 +77,22 @@ export default function VendorApplicationStatusScreen() {
   }
 
   if (!isRenderableStatus) {
+    const returnToLogin = async () => {
+      await signOut();
+      router.replace('/(auth)');
+    };
+
     return (
       <Screen>
         <AppHeader
           title="No active application status"
           subtitle="We could not find a vendor application status that needs review."
-          fallbackHref="/(client)"
+          fallbackHref="/(auth)"
         />
         <Text style={{ color: colors.textSecondary }}>
-          Return to your client home, or apply as a vendor again if you need to submit a new application.
+          Sign out and log back in if you need to use a different account or submit a new application.
         </Text>
-        <AppButton label="Return to client home" onPress={() => router.replace('/(client)')} />
+        <AppButton label="Return to login" onPress={returnToLogin} />
       </Screen>
     );
   }

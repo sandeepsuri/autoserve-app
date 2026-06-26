@@ -16,6 +16,7 @@ import {
   loadVendorOnboardingDraft,
   submitVendorOnboarding,
 } from '@/lib/vendor-onboarding';
+import { signOut } from '@/lib/auth';
 import { getStep, isDraftReadyFor } from '@/lib/vendor-onboarding-steps';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
@@ -114,6 +115,10 @@ export default function ReviewStep() {
     if (isLocked) return;
     router.push(getStep(stepId).route);
   };
+  const returnToLogin = async () => {
+    await signOut();
+    router.replace('/(auth)');
+  };
 
   const ORDERED_DAYS: DayOfWeek[] = [1, 2, 3, 4, 5, 6, 0];
   const openDays = ORDERED_DAYS.filter((d) => availability.weeklyRules[d].bookable);
@@ -135,8 +140,8 @@ export default function ReviewStep() {
       canContinue={isLocked || canSubmit}
       onContinue={handleSubmit}
       continueLabel={isLocked ? 'Back to status' : submitting ? 'Finishing…' : 'Finish setup'}
-      secondaryLabel={isLocked ? 'Return to client home' : 'Save & exit'}
-      onSecondary={isLocked ? () => router.replace('/(client)') : undefined}
+      secondaryLabel={isLocked ? 'Return to login' : 'Save & exit'}
+      onSecondary={isLocked ? returnToLogin : undefined}
     >
       {statusCopy ? (
         <View style={styles.statusBanner}>
