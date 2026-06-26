@@ -103,6 +103,21 @@ describe('loadVendorCapability (demo mode)', () => {
     expect(capability).toEqual({ hasActiveVendor: false, applicationStatus: 'needs_more_info' });
   });
 
+  it('reports a suspended applicant as having no active vendor (ticket 11)', async () => {
+    // A suspended vendor's row is deactivated, so capability is derived as
+    // no-active-vendor while the application status remains visible — this is
+    // what keeps a suspended user out of the vendor tabs after re-auth.
+    mockAuthGetState.mockReturnValue({ session: { userId: 'suspended-1', email: 'suspended@autoserve.app' } });
+    mockDemoGetState.mockReturnValue({
+      vendors: [],
+      vendorApplications: [{ ownerId: 'suspended-1', status: 'suspended' }],
+    });
+
+    const capability = await loadVendorCapability();
+
+    expect(capability).toEqual({ hasActiveVendor: false, applicationStatus: 'suspended' });
+  });
+
   it('returns no capability and no application status for an unrelated user', async () => {
     mockAuthGetState.mockReturnValue({ session: { userId: 'someone-else', email: 'someone@autoserve.app' } });
     mockDemoGetState.mockReturnValue({

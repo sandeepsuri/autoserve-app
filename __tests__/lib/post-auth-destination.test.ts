@@ -66,3 +66,51 @@ describe('getPostAuthDestination', () => {
     ).toEqual({ path: '/(client)/booking/vehicle', clearPostAuthPath: true });
   });
 });
+
+// Ticket 11: complete the lifecycle role matrix — every actor lands somewhere
+// safe and no non-approved actor reaches the vendor tabs.
+describe('getPostAuthDestination lifecycle role matrix (ticket 11)', () => {
+  it('guest with no profile and no pending application lands on role selection', () => {
+    expect(
+      getPostAuthDestination({
+        profile: null,
+        vendorCapability: { hasActiveVendor: false },
+        postAuthPath: null,
+      }),
+    ).toEqual({ path: '/(auth)/role', clearPostAuthPath: true });
+  });
+
+  it('client with no requested path lands on the client home', () => {
+    expect(
+      getPostAuthDestination({
+        profile: clientProfile,
+        vendorCapability: { hasActiveVendor: false },
+        postAuthPath: null,
+      }),
+    ).toEqual({ path: '/(client)', clearPostAuthPath: true });
+  });
+
+  it('draft application is not treated as pending and does not reach the vendor tabs', () => {
+    // draft is excluded from STATUS_SCREEN_STATUSES; a draft-only applicant with
+    // a client profile resumes the client experience rather than vendor ops.
+    expect(
+      getPostAuthDestination({
+        profile: clientProfile,
+        vendorCapability: { hasActiveVendor: false, applicationStatus: 'draft' },
+        postAuthPath: null,
+      }),
+    ).toEqual({ path: '/(client)', clearPostAuthPath: true });
+  });
+
+  it.each<VendorApplicationStatus>(['submitted', 'under_review', 'needs_more_info', 'rejected', 'suspended'])(
+    'never routes a %s applicant to the vendor tabs',
+    (applicationStatus) => {
+      const { path } = getPostAuthDestination({
+        profile: clientProfile,
+        vendorCapability: { hasActiveVendor: false, applicationStatus },
+        postAuthPath: null,
+      });
+      expect(path).not.toBe('/(vendor)');
+    },
+  );
+});
