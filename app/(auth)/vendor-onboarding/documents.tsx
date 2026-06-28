@@ -8,29 +8,21 @@ import { FilterChip } from '@/components/FilterChip';
 import { OnboardingStepShell } from '@/components/onboarding/OnboardingStepShell';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import {
+  DOC_REVIEW_STATUS_LABEL,
+  DOC_TYPE_LABEL,
+  docReviewStatusColor,
+  documentTypeLabel,
+} from '@/lib/verification-document-display';
+import {
   deleteVerificationDocument,
   listMyVerificationDocuments,
   uploadVerificationDocument,
 } from '@/lib/vendor-verification-documents';
-import { VerificationDocument, VerificationDocumentReviewStatus, VerificationDocumentType } from '@/types/domain';
+import { VerificationDocument, VerificationDocumentType } from '@/types/domain';
 
-const DOC_TYPES: { value: VerificationDocumentType; label: string }[] = [
-  { value: 'license', label: 'Business license' },
-  { value: 'insurance', label: 'Insurance' },
-  { value: 'id', label: 'Government ID' },
-  { value: 'proof_of_address', label: 'Proof of address' },
-  { value: 'other', label: 'Other' },
-];
-
-const STATUS_LABEL: Record<VerificationDocumentReviewStatus, string> = {
-  pending: 'Pending review',
-  accepted: 'Accepted',
-  rejected: 'Rejected',
-};
-
-function typeLabel(type: VerificationDocumentType) {
-  return DOC_TYPES.find((t) => t.value === type)?.label ?? 'Document';
-}
+const DOC_TYPES: { value: VerificationDocumentType; label: string }[] = (
+  Object.keys(DOC_TYPE_LABEL) as VerificationDocumentType[]
+).map((value) => ({ value, label: DOC_TYPE_LABEL[value] }));
 
 export default function DocumentsStep() {
   const [docs, setDocs] = useState<VerificationDocument[]>([]);
@@ -127,9 +119,9 @@ export default function DocumentsStep() {
           {docs.map((doc) => (
             <AppCard key={doc.id} style={styles.docRow}>
               <View style={styles.docInfo}>
-                <Text style={typography.labelMd}>{typeLabel(doc.documentType)}</Text>
-                <Text style={[styles.status, statusStyle(doc.reviewStatus)]}>
-                  {STATUS_LABEL[doc.reviewStatus]}
+                <Text style={typography.labelMd}>{documentTypeLabel(doc.documentType)}</Text>
+                <Text style={[styles.status, { color: docReviewStatusColor(doc.reviewStatus) }]}>
+                  {DOC_REVIEW_STATUS_LABEL[doc.reviewStatus]}
                 </Text>
                 {doc.reviewStatus === 'rejected' && doc.reviewerNotes ? (
                   <Text style={styles.notes}>{doc.reviewerNotes}</Text>
@@ -142,12 +134,6 @@ export default function DocumentsStep() {
       )}
     </OnboardingStepShell>
   );
-}
-
-function statusStyle(status: VerificationDocumentReviewStatus) {
-  if (status === 'accepted') return { color: colors.surfaceBrand };
-  if (status === 'rejected') return { color: colors.danger };
-  return { color: colors.textSecondary };
 }
 
 const styles = StyleSheet.create({

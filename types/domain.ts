@@ -123,6 +123,7 @@ export interface VendorOnboardingDraft {
   availabilityConfigured?: boolean;
   completed: boolean;
   submittedAt?: string;
+  reviewerNotes?: string;
   updatedAt?: string;
 }
 

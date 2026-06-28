@@ -271,6 +271,7 @@ function rowToDraft(row: VendorApplicationRow, profile?: UserProfile | null): Ve
     services: coerceServiceCatalog(row.service_catalog),
     completed: isSubmitted || Boolean(row.submitted_at),
     submittedAt: row.submitted_at ?? undefined,
+    reviewerNotes: row.reviewer_notes ?? undefined,
     updatedAt: row.updated_at ?? undefined,
   };
 }
@@ -390,6 +391,7 @@ export async function loadVendorOnboardingDraft(): Promise<VendorOnboardingDraft
         services: application.services,
         completed: application.status !== 'draft' && application.status !== 'needs_more_info',
         submittedAt: application.submittedAt,
+        reviewerNotes: application.reviewerNotes,
         updatedAt: application.updatedAt,
       };
     }

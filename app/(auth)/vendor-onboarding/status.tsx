@@ -11,10 +11,18 @@ import { signOut } from '@/lib/auth';
 import { shouldShowVendorApplicationStatus } from '@/lib/post-auth-destination';
 import { loadVendorCapability } from '@/lib/vendor-capability';
 import { loadVendorOnboardingDraft } from '@/lib/vendor-onboarding';
+import { listMyVerificationDocuments } from '@/lib/vendor-verification-documents';
 import { useAuthStore } from '@/store/useAuthStore';
-import type { VendorApplicationStatus, VendorOnboardingDraft } from '@/types/domain';
+import type { VendorApplicationStatus, VendorOnboardingDraft, VerificationDocument } from '@/types/domain';
 
-const SUMMARY_STATUSES: VendorApplicationStatus[] = ['submitted', 'under_review'];
+const DOCUMENT_FEEDBACK_STATUSES: VendorApplicationStatus[] = ['needs_more_info', 'rejected'];
+
+const DRAFT_DETAIL_STATUSES: VendorApplicationStatus[] = [
+  'submitted',
+  'under_review',
+  'needs_more_info',
+  'rejected',
+];
 
 export default function VendorApplicationStatusScreen() {
   const router = useRouter();
@@ -23,6 +31,7 @@ export default function VendorApplicationStatusScreen() {
   const setVendorCapability = useAuthStore((s) => s.setVendorCapability);
   const [capabilityLoading, setCapabilityLoading] = useState(false);
   const [draft, setDraft] = useState<VendorOnboardingDraft | null>(null);
+  const [documents, setDocuments] = useState<VerificationDocument[]>([]);
 
   const status = vendorCapability?.applicationStatus;
   const isRenderableStatus = shouldShowVendorApplicationStatus(status);
@@ -49,7 +58,7 @@ export default function VendorApplicationStatusScreen() {
   }, [capabilityLoading, session, setVendorCapability, vendorCapability]);
 
   useEffect(() => {
-    if (!status || !SUMMARY_STATUSES.includes(status)) {
+    if (!status || !DRAFT_DETAIL_STATUSES.includes(status)) {
       setDraft(null);
       return;
     }
@@ -61,6 +70,26 @@ export default function VendorApplicationStatusScreen() {
       })
       .catch(() => {
         if (!cancelled) setDraft(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
+  useEffect(() => {
+    if (!status || !DOCUMENT_FEEDBACK_STATUSES.includes(status)) {
+      setDocuments([]);
+      return;
+    }
+
+    let cancelled = false;
+    listMyVerificationDocuments()
+      .then((loadedDocs) => {
+        if (!cancelled) setDocuments(loadedDocs);
+      })
+      .catch(() => {
+        if (!cancelled) setDocuments([]);
       });
 
     return () => {
@@ -97,5 +126,11 @@ export default function VendorApplicationStatusScreen() {
     );
   }
 
-  return <ApplicationStatusScreen status={status as ApplicationStatusScreenStatus} draft={draft} />;
+  return (
+    <ApplicationStatusScreen
+      status={status as ApplicationStatusScreenStatus}
+      draft={draft}
+      documents={documents}
+    />
+  );
 }

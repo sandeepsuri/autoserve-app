@@ -1,6 +1,14 @@
+let mockIsSupabaseConfigured = false;
+const mockFrom = jest.fn();
+const mockRpc = jest.fn();
+
 jest.mock('@/lib/supabase', () => ({
-  isSupabaseConfigured: false,
-  supabase: null,
+  get isSupabaseConfigured() {
+    return mockIsSupabaseConfigured;
+  },
+  get supabase() {
+    return mockIsSupabaseConfigured ? { from: mockFrom, rpc: mockRpc } : null;
+  },
 }));
 
 jest.mock('@/store/useAuthStore', () => ({
@@ -24,6 +32,36 @@ import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 const mockAuthGetState = useAuthStore.getState as jest.Mock;
 const mockDemoGetState = useDemoDataStore.getState as jest.Mock;
 const mockSetSessionData = jest.fn();
+const baseApplicationRow = {
+  id: 'application-1',
+  owner_id: 'vendor-owner-1',
+  status: 'needs_more_info' as const,
+  business_type: 'shop' as const,
+  business_name: 'Riverside Garage',
+  business_description: 'General repair and maintenance.',
+  contact_name: 'Alex Rivers',
+  contact_email: 'riverside@autoserve.app',
+  contact_phone: '+1 310 555 0101',
+  location_mode: 'hybrid' as const,
+  address: '482 Riverside Way',
+  latitude: 34.0522,
+  longitude: -118.2437,
+  service_radius_miles: 30,
+  service_catalog: [
+    {
+      id: 'service-1',
+      title: 'Brake Check',
+      category: 'brakes',
+      description: 'Inspection and recommendations.',
+      durationMinutes: 40,
+      price: 55,
+      active: true,
+    },
+  ],
+  submitted_at: '2026-06-23T00:00:00.000Z',
+  reviewer_notes: 'Please upload current insurance and confirm your service radius.',
+  updated_at: '2026-06-24T00:00:00.000Z',
+};
 
 const demoState = {
   profiles: [],
@@ -89,6 +127,9 @@ const demoState = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockIsSupabaseConfigured = false;
+  mockFrom.mockReset();
+  mockRpc.mockReset();
   demoState.onboardingDrafts = [];
   demoState.vendorApplications = [];
   useVendorOnboardingStore.getState().reset();
@@ -106,6 +147,47 @@ beforeEach(() => {
   });
   mockDemoGetState.mockImplementation(() => demoState);
 });
+
+function mockLiveSupabase(applicationRow = baseApplicationRow) {
+  const profilesUpsert = jest.fn().mockResolvedValue({ error: null });
+  const applicationsUpsert = jest.fn().mockResolvedValue({ error: null });
+  const applicationsMaybeSingle = jest.fn().mockResolvedValue({ data: applicationRow, error: null });
+  const vendorsMaybeSingle = jest.fn().mockResolvedValue({ data: null, error: null });
+
+  mockFrom.mockImplementation((table: string) => {
+    if (table === 'profiles') {
+      return { upsert: profilesUpsert };
+    }
+    if (table === 'vendor_applications') {
+      return {
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({ maybeSingle: applicationsMaybeSingle }),
+        }),
+        upsert: applicationsUpsert,
+      };
+    }
+    if (table === 'vendors') {
+      return {
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({ maybeSingle: vendorsMaybeSingle }),
+        }),
+      };
+    }
+    return {};
+  });
+
+  mockRpc.mockResolvedValue({
+    data: { ...applicationRow, status: 'submitted', reviewer_notes: null },
+    error: null,
+  });
+
+  return {
+    applicationsMaybeSingle,
+    applicationsUpsert,
+    profilesUpsert,
+    vendorsMaybeSingle,
+  };
+}
 
 describe('vendor onboarding draft service', () => {
   it('treats only draft and needs_more_info applications as editable', () => {
@@ -254,5 +336,29 @@ describe('vendor onboarding draft service', () => {
     expect(draft.submittedAt).toBe('2026-06-23T00:00:00.000Z');
     expect(demoState.saveOnboardingDraft).not.toHaveBeenCalled();
     expect(demoState.saveVendorApplication).not.toHaveBeenCalled();
+  });
+
+  it('threads reviewer_notes into reviewerNotes in live mode', async () => {
+    mockIsSupabaseConfigured = true;
+    mockLiveSupabase();
+
+    const draft = await loadVendorOnboardingDraft();
+
+    expect(draft.reviewerNotes).toBe('Please upload current insurance and confirm your service radius.');
+    expect(draft.applicationStatus).toBe('needs_more_info');
+  });
+
+  it('resubmits a needs_more_info application through submit_vendor_application in live mode', async () => {
+    mockIsSupabaseConfigured = true;
+    const { applicationsUpsert } = mockLiveSupabase();
+
+    const draft = await submitVendorOnboarding();
+
+    expect(applicationsUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      owner_id: 'vendor-owner-1',
+      business_name: 'Riverside Garage',
+    }), { onConflict: 'owner_id' });
+    expect(mockRpc).toHaveBeenCalledWith('submit_vendor_application');
+    expect(draft.applicationStatus).toBe('submitted');
   });
 });

@@ -7,7 +7,12 @@ import { AppCard } from '@/components/AppCard';
 import { ApplicationSummary } from '@/components/onboarding/ApplicationSummary';
 import { colors, spacing, typography } from '@/constants/theme';
 import { signOut } from '@/lib/auth';
-import type { VendorApplicationStatus, VendorOnboardingDraft } from '@/types/domain';
+import {
+  DOC_REVIEW_STATUS_LABEL,
+  docReviewStatusColor,
+  documentTypeLabel,
+} from '@/lib/verification-document-display';
+import type { VendorApplicationStatus, VendorOnboardingDraft, VerificationDocument } from '@/types/domain';
 
 export type ApplicationStatusScreenStatus = Extract<
   VendorApplicationStatus,
@@ -35,7 +40,7 @@ const STATUS_COPY: Record<ApplicationStatusScreenStatus, { title: string; body: 
     title: 'We need more information',
     body: 'Our team needs additional details to continue reviewing your application.',
     nextSteps:
-      "Our team will contact you via email or phone with what's needed. No action is required from you right now.",
+      "Review the note from our team, update your application, and resubmit it when you're ready.",
   },
   suspended: {
     title: 'Your vendor access has been suspended',
@@ -51,19 +56,33 @@ interface Props {
   /**
    * The applicant's submitted application, used to render a read-only
    * summary below "What happens next" for submitted/under_review statuses.
-   * Ignored for rejected/needs_more_info/suspended.
+   * Also carries reviewer notes for rejected/needs_more_info statuses.
    */
   draft?: VendorOnboardingDraft | null;
+  /**
+   * The applicant's verification documents, used to surface per-document
+   * review feedback for needs_more_info/rejected statuses.
+   */
+  documents?: VerificationDocument[] | null;
 }
 
-export function ApplicationStatusScreen({ status, draft }: Props) {
+export function ApplicationStatusScreen({ status, draft, documents }: Props) {
   const router = useRouter();
   const copy = STATUS_COPY[status];
   const showSummary = PENDING_REVIEW_STATUSES.includes(status);
+  const showReviewerNote = status === 'needs_more_info' || status === 'rejected';
+  const canEditAndResubmit = status === 'needs_more_info';
+  const reviewerNote = draft?.reviewerNotes?.trim() || 'No reviewer note was provided.';
+  const showDocumentReview =
+    (status === 'needs_more_info' || status === 'rejected') && (documents?.length ?? 0) > 0;
 
   const returnToLogin = async () => {
     await signOut();
     router.replace('/(auth)');
+  };
+
+  const editAndResubmit = () => {
+    router.push('/(auth)/vendor-onboarding');
   };
 
   return (
@@ -79,11 +98,40 @@ export function ApplicationStatusScreen({ status, draft }: Props) {
           <Text style={styles.bodyText}>{copy.nextSteps}</Text>
         </AppCard>
 
+        {showReviewerNote ? (
+          <AppCard style={styles.card}>
+            <Text style={typography.titleSm}>Reviewer note</Text>
+            <Text style={styles.bodyText}>{reviewerNote}</Text>
+          </AppCard>
+        ) : null}
+
+        {showDocumentReview ? (
+          <AppCard style={styles.card}>
+            <Text style={typography.titleSm}>Document review</Text>
+            {documents!.map((doc) => (
+              <View key={doc.id} style={styles.docRow}>
+                <Text style={typography.labelMd}>{documentTypeLabel(doc.documentType)}</Text>
+                <Text style={[styles.docStatus, { color: docReviewStatusColor(doc.reviewStatus) }]}>
+                  {DOC_REVIEW_STATUS_LABEL[doc.reviewStatus]}
+                </Text>
+                {doc.reviewerNotes ? <Text style={styles.bodyText}>{doc.reviewerNotes}</Text> : null}
+              </View>
+            ))}
+          </AppCard>
+        ) : null}
+
         {showSummary ? <ApplicationSummary draft={draft} /> : null}
       </ScrollView>
 
       <View style={styles.footer}>
-        <AppButton label="Return to login" onPress={returnToLogin} />
+        {canEditAndResubmit ? (
+          <AppButton label="Edit & resubmit" onPress={editAndResubmit} />
+        ) : null}
+        <AppButton
+          label="Return to login"
+          variant={canEditAndResubmit ? 'ghost' : 'primary'}
+          onPress={returnToLogin}
+        />
       </View>
     </SafeAreaView>
   );
@@ -120,6 +168,13 @@ const styles = StyleSheet.create({
   bodyText: {
     ...typography.bodyMd,
     color: colors.textSecondary,
+  },
+  docRow: {
+    gap: spacing.xs / 2,
+    paddingTop: spacing.sm,
+  },
+  docStatus: {
+    ...typography.caption,
   },
   footer: {
     padding: spacing.page,
