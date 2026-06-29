@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { demoBookings, demoProfiles, demoReviews, demoServices, demoVehicles, demoVendors } from '@/constants/mock-data';
-import { BookingRecord, Service, UserProfile, Vehicle, VendorOnboardingDraft, VendorSummary } from '@/types/domain';
+import { BookingRecord, Service, UserProfile, Vehicle, VendorApplication, VendorOnboardingDraft, VendorSummary, VerificationDocument } from '@/types/domain';
 import { VendorAvailability } from '@/store/useVendorAvailabilityStore';
 
 interface DemoDataState {
@@ -13,6 +13,9 @@ interface DemoDataState {
   vehicles: Vehicle[];
   bookings: BookingRecord[];
   onboardingDrafts: VendorOnboardingDraft[];
+  vendorApplications: VendorApplication[];
+  /** Applicant-uploaded verification documents (metadata only in demo mode) */
+  verificationDocuments: VerificationDocument[];
   /** Keyed by vendorId; stores persisted availability for demo vendors */
   vendorAvailabilities: Record<string, VendorAvailability>;
   addOrUpdateProfile: (profile: UserProfile) => void;
@@ -27,6 +30,9 @@ interface DemoDataState {
   updateVendor: (vendorId: string, patch: Partial<VendorSummary>) => void;
   upsertVendor: (vendor: VendorSummary) => void;
   saveOnboardingDraft: (draft: VendorOnboardingDraft) => void;
+  saveVendorApplication: (application: VendorApplication) => void;
+  addVerificationDocument: (document: VerificationDocument) => void;
+  removeVerificationDocument: (documentId: string) => void;
   saveVendorAvailability: (vendorId: string, availability: VendorAvailability) => void;
 }
 
@@ -39,6 +45,8 @@ export const useDemoDataStore = create<DemoDataState>()(
       vehicles: demoVehicles,
       bookings: demoBookings,
       onboardingDrafts: [],
+      vendorApplications: [],
+      verificationDocuments: [],
       vendorAvailabilities: {},
       addOrUpdateProfile: (profile) =>
         set((state) => ({
@@ -88,6 +96,22 @@ export const useDemoDataStore = create<DemoDataState>()(
             ? state.onboardingDrafts.map((item) => (item.ownerId === draft.ownerId ? draft : item))
             : [draft, ...state.onboardingDrafts],
         })),
+      saveVendorApplication: (application) =>
+        set((state) => ({
+          vendorApplications: state.vendorApplications.some((item) => item.ownerId === application.ownerId)
+            ? state.vendorApplications.map((item) => (item.ownerId === application.ownerId ? application : item))
+            : [application, ...state.vendorApplications],
+        })),
+      addVerificationDocument: (document) =>
+        set((state) => ({
+          verificationDocuments: state.verificationDocuments.some((item) => item.id === document.id)
+            ? state.verificationDocuments.map((item) => (item.id === document.id ? document : item))
+            : [document, ...state.verificationDocuments],
+        })),
+      removeVerificationDocument: (documentId) =>
+        set((state) => ({
+          verificationDocuments: state.verificationDocuments.filter((item) => item.id !== documentId),
+        })),
       saveVendorAvailability: (vendorId, availability) =>
         set((state) => ({
           vendorAvailabilities: { ...state.vendorAvailabilities, [vendorId]: availability },
@@ -103,6 +127,8 @@ export const useDemoDataStore = create<DemoDataState>()(
         vehicles: state.vehicles,
         bookings: state.bookings,
         onboardingDrafts: state.onboardingDrafts,
+        vendorApplications: state.vendorApplications,
+        verificationDocuments: state.verificationDocuments,
         vendorAvailabilities: state.vendorAvailabilities,
       }),
     }

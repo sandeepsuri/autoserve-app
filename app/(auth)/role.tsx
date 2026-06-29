@@ -8,6 +8,7 @@ import { AppCard } from '@/components/AppCard';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
 import { setRole } from '@/lib/auth';
+import { VENDOR_APPLICATION_PATH } from '@/lib/route-gate';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export default function RoleSelectionScreen() {
@@ -23,14 +24,16 @@ export default function RoleSelectionScreen() {
   return (
     <Screen contentStyle={styles.container}>
       <AppHeader
-        title="Choose your AutoServe experience"
-        subtitle="One account, two paths: book service as a driver or manage jobs as a vendor."
+        title="Welcome to AutoServe"
+        subtitle="Book service as a driver, or apply to list your shop on the marketplace after review."
         fallbackHref="/(auth)"
       />
 
       <AppCard style={styles.card}>
         <Text style={typography.titleSm}>Client App</Text>
-        <Text style={styles.body}>Browse nearby providers, select your vehicle, and complete bookings in a few quick steps.</Text>
+        <Text style={styles.body}>
+          Browse nearby providers, select your vehicle, and complete bookings in a few quick steps.
+        </Text>
         <AppButton
           label="Continue as Client"
           onPress={async () => {
@@ -43,14 +46,18 @@ export default function RoleSelectionScreen() {
       </AppCard>
 
       <AppCard style={styles.card}>
-        <Text style={typography.titleSm}>Vendor App</Text>
-        <Text style={styles.body}>Set up your shop, manage services, define your mobile radius, and accept bookings.</Text>
+        <Text style={typography.titleSm}>Apply as a Vendor</Text>
+        <Text style={styles.body}>
+          Submit your business for review. You will not appear in discovery until an AutoServe admin approves
+          your application.
+        </Text>
         <AppButton
-          label="Continue as Vendor"
+          label="Apply to Become a Vendor"
           variant="secondary"
           onPress={async () => {
-            await setRole('vendor');
-            router.push('/(auth)/vendor-setup');
+            setPostAuthPath(VENDOR_APPLICATION_PATH);
+            await setRole('client');
+            router.push(VENDOR_APPLICATION_PATH as never);
           }}
         />
       </AppCard>

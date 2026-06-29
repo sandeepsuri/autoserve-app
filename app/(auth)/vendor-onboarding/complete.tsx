@@ -8,41 +8,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { signOut } from '@/lib/auth';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
-
-const NEXT_STEPS: { label: string; description: string; route: string }[] = [
-  {
-    label: 'Review your live services',
-    description: 'Edit catalog, toggle visibility, and refine pricing.',
-    route: '/(vendor)/services',
-  },
-  {
-    label: 'Confirm your location and radius',
-    description: 'Update address, service area, and mobile coverage.',
-    route: '/(vendor)/location',
-  },
-  {
-    label: 'Open your operational dashboard',
-    description: 'See bookings, earnings overview, and quick actions.',
-    route: '/(vendor)',
-  },
-  {
-    label: 'Visit your vendor profile',
-    description: 'Manage account details and sign-out options.',
-    route: '/(vendor)/profile',
-  },
-];
 
 export default function VendorOnboardingComplete() {
   const router = useRouter();
   const { draft, reset } = useVendorOnboardingStore();
-  const profile = useAuthStore((s) => s.profile);
+  const vendorCapability = useAuthStore((s) => s.vendorCapability);
 
   const snapshotRef = useRef({
     businessName: draft?.profile?.businessName,
     serviceCount: (draft?.services ?? []).filter((s) => s.active ?? true).length,
     totalServices: (draft?.services ?? []).length,
     completed: draft?.completed ?? false,
+    applicationStatus: draft?.applicationStatus,
   });
 
   const snapshot = snapshotRef.current;
@@ -52,71 +31,73 @@ export default function VendorOnboardingComplete() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isCompleted =
+  const isSubmitted =
     snapshot.completed ||
-    (profile?.role === 'vendor' && Boolean(profile.businessType));
+    snapshot.applicationStatus === 'submitted' ||
+    snapshot.applicationStatus === 'under_review' ||
+    snapshot.applicationStatus === 'needs_more_info' ||
+    Boolean(vendorCapability?.hasActiveVendor);
 
-  if (!isCompleted) {
+  if (!isSubmitted) {
     return <Redirect href="/(auth)/vendor-onboarding" />;
   }
+
+  const isApprovedVendor = Boolean(vendorCapability?.hasActiveVendor);
+  const returnToLogin = async () => {
+    await signOut();
+    router.replace('/(auth)');
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.crest}>
           <Text style={styles.checkMark}>✓</Text>
-          <Text style={styles.title}>{"You're set up"}</Text>
+          <Text style={styles.title}>{isApprovedVendor ? "You're set up" : 'Application submitted'}</Text>
           {snapshot.businessName ? (
-            <Text style={styles.subtitle}>{snapshot.businessName} is live on AutoServe.</Text>
+            <Text style={styles.subtitle}>
+              {isApprovedVendor
+                ? `${snapshot.businessName} is live on AutoServe.`
+                : `${snapshot.businessName} is pending review. We'll notify you once an admin approves your application.`}
+            </Text>
           ) : (
-            <Text style={styles.subtitle}>Your vendor account is ready.</Text>
+            <Text style={styles.subtitle}>
+              {isApprovedVendor
+                ? 'Your vendor account is ready.'
+                : 'Your vendor application is pending review.'}
+            </Text>
           )}
         </View>
 
         <AppCard style={styles.card}>
-          <Text style={typography.titleSm}>Setup complete</Text>
+          <Text style={typography.titleSm}>{isApprovedVendor ? 'Setup complete' : 'What happens next'}</Text>
           <CompletedRow label="Business profile saved" />
           <CompletedRow label="Location and service area set" />
           <CompletedRow
             label={
               snapshot.totalServices === 1
-                ? '1 service published'
-                : `${snapshot.serviceCount} of ${snapshot.totalServices} services enabled`
+                ? '1 service included in your application'
+                : `${snapshot.serviceCount} of ${snapshot.totalServices} services included`
             }
           />
-        </AppCard>
-
-        <AppCard style={styles.nextStepsCard}>
-          <View style={styles.nextStepsHeader}>
-            <Text style={typography.titleSm}>Recommended next steps</Text>
-            <Text style={styles.recommendedTag}>Optional</Text>
-          </View>
-          {NEXT_STEPS.map((item) => (
-            <Pressable
-              key={item.route}
-              onPress={() => router.replace(item.route as Parameters<typeof router.replace>[0])}
-              style={({ pressed }) => [styles.nextStepRow, pressed && styles.nextStepRowPressed]}
-            >
-              <View style={styles.nextStepText}>
-                <Text style={styles.nextStepLabel}>{item.label}</Text>
-                <Text style={styles.nextStepDescription}>{item.description}</Text>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </Pressable>
-          ))}
+          {!isApprovedVendor ? (
+            <CompletedRow label="AutoServe admin review required before you go live" />
+          ) : null}
         </AppCard>
       </ScrollView>
 
       <View style={styles.footer}>
         <AppButton
-          label="Go to dashboard"
-          onPress={() => router.replace('/(vendor)')}
+          label={isApprovedVendor ? 'Go to dashboard' : 'Return to login'}
+          onPress={isApprovedVendor ? () => router.replace('/(vendor)') : returnToLogin}
         />
-        <AppButton
-          label="Review setup again"
-          variant="ghost"
-          onPress={() => router.replace('/(auth)/vendor-onboarding/review')}
-        />
+        {!isApprovedVendor ? (
+          <AppButton
+            label="Review application"
+            variant="ghost"
+            onPress={() => router.replace('/(auth)/vendor-onboarding/review')}
+          />
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -182,49 +163,6 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: spacing.md,
-  },
-  nextStepsCard: {
-    gap: spacing.md,
-    backgroundColor: colors.surfaceSubtleGreen,
-    borderColor: colors.surfaceSubtleGreen,
-  },
-  nextStepsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  recommendedTag: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  nextStepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.bgElevated,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderDefault,
-  },
-  nextStepRowPressed: {
-    opacity: 0.85,
-  },
-  nextStepText: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  nextStepLabel: {
-    ...typography.labelLg,
-    color: colors.textPrimary,
-  },
-  nextStepDescription: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  chevron: {
-    ...typography.titleSm,
-    color: colors.textSecondary,
   },
   footer: {
     padding: spacing.page,

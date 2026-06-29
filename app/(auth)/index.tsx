@@ -10,6 +10,7 @@ import { AppButton } from '@/components/AppButton';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
 import { signIn, signInWithGoogle, signUp } from '@/lib/auth';
+import { getPostAuthDestination } from '@/lib/post-auth-destination';
 import { emailSchema, sanitizeName } from '@/lib/validation';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -48,20 +49,19 @@ export default function AuthScreen() {
   const handleSuccess = () => {
     const nextPath = postAuthPath;
     const profile = useAuthStore.getState().profile;
+    const vendorCapability = useAuthStore.getState().vendorCapability;
 
     setGuestMode(false);
 
-    if (profile?.role === 'client') {
-      setPostAuthPath(null);
-      router.replace((nextPath as never) || '/(client)');
-    } else if (profile?.role === 'vendor') {
-      setPostAuthPath(null);
-      router.replace('/(vendor)');
-    } else {
-      // Keep postAuthPath until role selection consumes it. Guest booking
-      // flows sign in here, then role selection returns clients to the draft.
-      router.replace('/(auth)/role');
-    }
+    const destination = getPostAuthDestination({
+      profile,
+      vendorCapability,
+      postAuthPath: nextPath,
+    });
+    if (destination.clearPostAuthPath) setPostAuthPath(null);
+    // Keep postAuthPath until role selection consumes it. Guest booking
+    // flows sign in here, then role selection returns clients to the draft.
+    router.replace(destination.path as never);
   };
 
   const onSubmit = handleSubmit(async (values) => {

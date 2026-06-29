@@ -45,6 +45,7 @@ const auth = supabase!.auth as jest.Mocked<NonNullable<typeof supabase>['auth']>
 const mockFrom = supabase!.from as jest.Mock;
 const mockGetState = useAuthStore.getState as jest.Mock;
 const mockSetSessionData = jest.fn();
+const mockSetVendorCapability = jest.fn();
 const mockClearAuth = jest.fn();
 
 const mockUser = { id: 'user-123', email: 'test@example.com' };
@@ -56,6 +57,7 @@ beforeEach(() => {
     session: null,
     profile: null,
     setSessionData: mockSetSessionData,
+    setVendorCapability: mockSetVendorCapability,
     clearAuth: mockClearAuth,
   });
   mockFrom.mockReturnValue({

@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Href, useRouter } from 'expo-router';
@@ -7,6 +7,7 @@ import { AppButton } from '@/components/AppButton';
 import { AppHeader } from '@/components/AppHeader';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { colors, spacing, typography } from '@/constants/theme';
+import { isVendorApplicationLocked } from '@/lib/vendor-onboarding';
 import { getNextStep, getPrevStep, VendorOnboardingStepId } from '@/lib/vendor-onboarding-steps';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 
@@ -17,6 +18,8 @@ interface Props {
   canContinue: boolean;
   onContinue?: () => void | Promise<void>;
   continueLabel?: string;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
   children: ReactNode;
 }
 
@@ -27,14 +30,23 @@ export function OnboardingStepShell({
   canContinue,
   onContinue,
   continueLabel = 'Continue',
+  secondaryLabel = 'Save & exit',
+  onSecondary,
   children,
 }: Props) {
   const router = useRouter();
   const markComplete = useVendorOnboardingStore((s) => s.markComplete);
+  const draft = useVendorOnboardingStore((s) => s.draft);
 
   const prevStep = getPrevStep(stepId);
   const nextStep = getNextStep(stepId);
   const backTarget: Href = prevStep?.route ?? '/(auth)/role';
+
+  useEffect(() => {
+    if (stepId !== 'review' && (draft?.completed || isVendorApplicationLocked(draft?.applicationStatus))) {
+      router.replace('/(auth)/vendor-onboarding/review');
+    }
+  }, [draft?.applicationStatus, draft?.completed, router, stepId]);
 
   const handleBack = () => router.replace(backTarget);
 
@@ -54,6 +66,10 @@ export function OnboardingStepShell({
   };
 
   const handleSaveExit = () => {
+    if (onSecondary) {
+      onSecondary();
+      return;
+    }
     router.replace('/(auth)/role');
   };
 
@@ -72,7 +88,7 @@ export function OnboardingStepShell({
           onPress={handleContinue}
         />
         <AppButton
-          label="Save & exit"
+          label={secondaryLabel}
           variant="ghost"
           onPress={handleSaveExit}
         />
