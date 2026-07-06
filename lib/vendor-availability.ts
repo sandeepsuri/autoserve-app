@@ -15,6 +15,7 @@ import {
   DayOfWeek,
   DayRule,
   makeDefaultAvailability,
+  makeEmptyAvailability,
   ServiceModeRules,
   SlotLengthMinutes,
   timeToMinutes,
@@ -328,7 +329,15 @@ export async function detectAvailabilityConflicts(
  * When vendorId is omitted, resolves to the current auth user's vendor.
  * Falls back to makeDefaultAvailability() in demo mode.
  */
-export async function loadVendorAvailability(vendorId?: string): Promise<VendorAvailability> {
+export async function loadVendorAvailability(
+  vendorId?: string,
+  opts?: { fallback?: 'default' | 'empty' },
+): Promise<VendorAvailability> {
+  // Vendor-side callers (onboarding/editing) want a default template to start
+  // from; client-side callers want an honest "empty" so unconfigured vendors
+  // don't show fabricated slots.
+  const fallback = () =>
+    opts?.fallback === 'empty' ? makeEmptyAvailability() : makeDefaultAvailability();
   const ownerId = useAuthStore.getState().session?.userId;
 
   if (!isSupabaseConfigured || !supabase) {
@@ -340,19 +349,19 @@ export async function loadVendorAvailability(vendorId?: string): Promise<VendorA
       const demoAvail = demoStore.vendorAvailabilities?.[resolvedVendorId];
       if (demoAvail) return demoAvail;
     }
-    return makeDefaultAvailability();
+    return fallback();
   }
 
   let resolvedVendorId = vendorId;
   if (!resolvedVendorId) {
-    if (!ownerId) return makeDefaultAvailability();
+    if (!ownerId) return fallback();
     const { data: vendorRow } = await supabase
       .from('vendors')
       .select('id')
       .eq('owner_id', ownerId)
       .maybeSingle();
     resolvedVendorId = vendorRow?.id;
-    if (!resolvedVendorId) return makeDefaultAvailability();
+    if (!resolvedVendorId) return fallback();
   }
 
   const [availResult, blockedResult] = await Promise.all([
@@ -371,7 +380,7 @@ export async function loadVendorAvailability(vendorId?: string): Promise<VendorA
   if (availResult.error) throw dbError(availResult.error, 'Load availability settings');
   if (blockedResult.error) throw dbError(blockedResult.error, 'Load blocked periods');
 
-  if (!availResult.data) return makeDefaultAvailability();
+  if (!availResult.data) return fallback();
 
   return rowToAvailability(
     availResult.data as unknown as VendorAvailabilityRow,

@@ -10,6 +10,7 @@ export type {
   TimeString,
   TimeBlock,
 } from '@/store/useVendorAvailabilityStore';
+import type { VendorAvailability } from '@/store/useVendorAvailabilityStore';
 
 export type UserRole = 'client' | 'vendor';
 export type BusinessType = 'shop' | 'solo';
@@ -121,6 +122,8 @@ export interface VendorOnboardingDraft {
   services: VendorOnboardingServiceDraft[];
   /** Availability is captured in the onboarding availability step */
   availabilityConfigured?: boolean;
+  /** The configured weekly availability, persisted on submit and materialized on approval */
+  availability?: VendorAvailability;
   completed: boolean;
   submittedAt?: string;
   reviewerNotes?: string;
