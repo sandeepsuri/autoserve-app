@@ -360,7 +360,7 @@ export default function ServicesStep() {
               onChangeText={(price) => setEditor((current) => ({ ...current, price }))}
               placeholder="95"
               keyboardType="decimal-pad"
-              helperText="USD"
+              helperText="CAD"
               maxLength={8}
               errorText={errors.price}
             />

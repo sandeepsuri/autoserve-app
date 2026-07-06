@@ -33,6 +33,9 @@ function mapVendorRow(item: Record<string, unknown>): VendorSummary {
       latitude: item.latitude as number,
       longitude: item.longitude as number,
     },
+    stripeAccountId: (item.stripe_account_id as string | undefined) ?? undefined,
+    stripeTransfersStatus: (item.stripe_transfers_status as VendorSummary['stripeTransfersStatus'] | undefined) ?? undefined,
+    stripeAccountUpdatedAt: (item.stripe_account_updated_at as string | undefined) ?? undefined,
   };
 }
 

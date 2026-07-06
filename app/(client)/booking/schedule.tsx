@@ -16,6 +16,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { useStripe } from '@stripe/stripe-react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -31,7 +32,9 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { createBookingFromSelections } from '@/lib/bookings';
 import { ensureProfileRow } from '@/lib/auth';
+import { cancelUnpaidBookingAfterPaymentFailure, createBookingPayment } from '@/lib/payments';
 import { queryClient } from '@/lib/query-client';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { getVendorDetail } from '@/lib/vendors';
 import { listVehicles } from '@/lib/vehicles';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -40,7 +43,7 @@ import {
   deriveAvailableSlots,
   formatTimeDisplay,
   isDateFullyBooked,
-  useVendorAvailabilityStore,
+  makeEmptyAvailability,
 } from '@/store/useVendorAvailabilityStore';
 import { Service } from '@/types/domain';
 
@@ -138,10 +141,11 @@ function getUpcomingDateOptions(): { value: string; label: string; monthLabel: s
 
 export default function BookingScheduleScreen() {
   const router = useRouter();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const insets = useSafeAreaInsets();
   const { draft, clearDraft, updateDraft } = useBookingDraftStore();
   const { session, profile, guestMode, guestClientId, setPostAuthPath } = useAuthStore();
-  const { availability } = useVendorAvailabilityStore();
+  const [confirming, setConfirming] = useState(false);
 
   const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
 
@@ -159,8 +163,9 @@ export default function BookingScheduleScreen() {
 
   const vendor = data?.vendor;
   const services = data?.services ?? [];
-  // Use server-loaded availability when available; fall back to store (demo/offline)
-  const vendorAvailability = data?.availability ?? availability;
+  // Use server-loaded availability only; an unconfigured vendor yields an empty
+  // (no-slot) availability so we show the honest "no availability" state.
+  const vendorAvailability = data?.availability ?? makeEmptyAvailability();
   const selectedServiceIds = draft.serviceIds ?? [];
   const selectedServices = services.filter((service) =>
     selectedServiceIds.includes(service.id),
@@ -310,7 +315,7 @@ export default function BookingScheduleScreen() {
   };
 
   const confirmBooking = async () => {
-    if (!canConfirm) return;
+    if (!canConfirm || confirming) return;
 
     if (!session) {
       setPostAuthPath('/(client)/booking/vehicle');
@@ -324,6 +329,7 @@ export default function BookingScheduleScreen() {
     }
 
     await ensureProfileRow();
+    setConfirming(true);
 
     try {
       const vehicleId = draft.vehicleId;
@@ -346,6 +352,30 @@ export default function BookingScheduleScreen() {
         clientName: profile?.fullName,
       });
 
+      if (isSupabaseConfigured) {
+        const payment = await createBookingPayment(booking.id);
+        // When the vendor hasn't completed payout setup, payment is skipped and
+        // the booking proceeds unpaid.
+        if (payment.paymentRequired && payment.clientSecret) {
+          const initResult = await initPaymentSheet({
+            merchantDisplayName: 'AutoServe',
+            paymentIntentClientSecret: payment.clientSecret,
+            returnURL: 'autoserve://stripe-redirect',
+          });
+
+          if (initResult.error) {
+            await cancelUnpaidBookingAfterPaymentFailure(booking.id);
+            throw new Error(initResult.error.message);
+          }
+
+          const paymentResult = await presentPaymentSheet();
+          if (paymentResult.error) {
+            await cancelUnpaidBookingAfterPaymentFailure(booking.id);
+            throw new Error(paymentResult.error.message);
+          }
+        }
+      }
+
       clearDraft();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['client-bookings'] }),
@@ -359,6 +389,8 @@ export default function BookingScheduleScreen() {
       });
     } catch (err) {
       Alert.alert('Booking failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -619,9 +651,9 @@ export default function BookingScheduleScreen() {
           </View>
         </View>
         <AppButton
-          label={session ? 'Book Appointment' : 'Sign In to Confirm'}
+          label={confirming ? 'Confirming...' : session ? 'Book Appointment' : 'Sign In to Confirm'}
           variant="accent"
-          disabled={!canConfirm}
+          disabled={!canConfirm || confirming}
           onPress={confirmBooking}
         />
       </View>

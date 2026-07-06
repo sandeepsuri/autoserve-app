@@ -11,6 +11,9 @@ import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
 import { STATUS_COLORS, STATUS_LABEL } from '@/lib/booking-status';
 import { getBookingById, updateBookingStatus } from '@/lib/bookings';
+import { captureBookingPayment, cancelBookingPayment } from '@/lib/payments';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { getCurrentVendorPayoutStatus } from '@/lib/vendor-payouts';
 
 export default function VendorBookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,6 +25,11 @@ export default function VendorBookingDetailScreen() {
     queryKey: ['booking-detail', id],
     queryFn: () => getBookingById(id),
     enabled: Boolean(id),
+  });
+
+  const { data: vendor } = useQuery({
+    queryKey: ['vendor-payout-status'],
+    queryFn: getCurrentVendorPayoutStatus,
   });
 
   if (isLoading) {
@@ -54,10 +62,18 @@ export default function VendorBookingDetailScreen() {
       ? booking.mobileAddress
       : 'At the shop';
 
+  const payoutReady = !isSupabaseConfigured || vendor?.stripeTransfersStatus === 'active';
+
   const mutate = async (status: 'confirmed' | 'cancelled' | 'completed') => {
     setBusy(true);
     try {
-      await updateBookingStatus(booking.id, status);
+      if (status === 'confirmed') {
+        await captureBookingPayment(booking.id);
+      } else if (status === 'cancelled' && booking.status === 'pending') {
+        await cancelBookingPayment(booking.id);
+      } else {
+        await updateBookingStatus(booking.id, status);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['vendor-bookings'] }),
         queryClient.invalidateQueries({ queryKey: ['client-bookings'] }),
@@ -137,7 +153,10 @@ export default function VendorBookingDetailScreen() {
       <View style={styles.actions}>
         {booking.status === 'pending' ? (
           <>
-            <AppButton label={busy ? 'Accepting…' : 'Accept booking'}  variant="accent"    disabled={busy} onPress={() => mutate('confirmed')} />
+            {payoutReady ? null : (
+              <Text style={styles.payoutGate}>Finish payout setup to accept paid bookings.</Text>
+            )}
+            <AppButton label={busy ? 'Accepting…' : 'Accept booking'}  variant="accent"    disabled={busy || !payoutReady} onPress={() => mutate('confirmed')} />
             <AppButton label={busy ? 'Rejecting…' : 'Reject booking'}  variant="secondary" disabled={busy} onPress={() => mutate('cancelled')} />
           </>
         ) : null}
@@ -191,5 +210,10 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     textAlign: 'center',
     marginTop: -spacing.xs,
+  },
+  payoutGate: {
+    ...typography.caption,
+    color: colors.danger,
+    textAlign: 'center',
   },
 });
