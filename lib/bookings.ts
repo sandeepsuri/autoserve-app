@@ -94,6 +94,15 @@ function rowToRecord(item: Record<string, unknown>): BookingRecord {
   };
 }
 
+// How the client pays for a booking: in-app via Stripe when a payment intent
+// exists, otherwise directly at the vendor (vendor wasn't payout-ready when
+// the booking was created).
+export function bookingPaymentLabel(booking: Pick<BookingRecord, 'paymentStatus'>): string {
+  if (booking.paymentStatus === 'captured') return 'Paid online';
+  if (booking.paymentStatus === 'requires_capture') return 'Paid online · held';
+  return 'Pay at shop';
+}
+
 // ─── List ─────────────────────────────────────────────────────────────────────
 
 export async function listBookingsForCurrentUser(): Promise<BookingRecord[]> {

@@ -9,7 +9,30 @@ export interface StripeConnectOnboardingSession {
 }
 
 export async function getCurrentVendorPayoutStatus(): Promise<VendorSummary | null> {
-  return getVendorForOwner();
+  const vendor = await getVendorForOwner();
+
+  // The stored status only changes via webhook, which can lag behind Stripe
+  // (or not be configured); re-check the live account until it goes active.
+  if (
+    vendor &&
+    vendor.stripeAccountId &&
+    vendor.stripeTransfersStatus !== 'active' &&
+    isSupabaseConfigured &&
+    supabase
+  ) {
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-connect-status', { body: {} });
+      const liveStatus = (data as { stripe_transfers_status?: VendorSummary['stripeTransfersStatus'] } | null)
+        ?.stripe_transfers_status;
+      if (!error && liveStatus) {
+        return { ...vendor, stripeTransfersStatus: liveStatus };
+      }
+    } catch {
+      /* fall back to the stored status */
+    }
+  }
+
+  return vendor;
 }
 
 export async function startVendorPayoutOnboarding(): Promise<StripeConnectOnboardingSession> {

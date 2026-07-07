@@ -19,7 +19,7 @@ import { FilterChip } from '@/components/FilterChip';
 import { Screen } from '@/components/Screen';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { STATUS_COLORS, STATUS_LABEL } from '@/lib/booking-status';
-import { listBookingsForVendorOwner, updateBookingStatus } from '@/lib/bookings';
+import { bookingPaymentLabel, listBookingsForVendorOwner } from '@/lib/bookings';
 import { formatScheduledEST } from '@/lib/format';
 import { captureBookingPayment, cancelBookingPayment } from '@/lib/payments';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -255,10 +255,6 @@ export default function VendorBookingsScreen() {
     ]);
 
   const accept = async (booking: BookingRecord) => {
-    if (!payoutReady) {
-      Alert.alert('Payout setup required', 'Finish payout setup before accepting paid bookings.');
-      return;
-    }
     try {
       await captureBookingPayment(booking.id);
       await invalidateAll(booking.id);
@@ -319,9 +315,9 @@ export default function VendorBookingsScreen() {
 
       {!payoutReady && pendingCount > 0 ? (
         <AppCard style={styles.payoutGateCard}>
-          <Text style={styles.payoutGateTitle}>Finish payout setup to accept bookings</Text>
+          <Text style={styles.payoutGateTitle}>Payouts not set up</Text>
           <Text style={styles.payoutGateBody}>
-            You can still review requests, but paid bookings require active Stripe transfers before acceptance.
+            You can still accept bookings — clients will pay at the shop. Set up payouts to accept in-app payments.
           </Text>
           <AppButton
             label="Set up payouts"
@@ -496,7 +492,7 @@ export default function VendorBookingsScreen() {
                     )}
                   </View>
 
-                  {/* Detail grid: up to 4 boxes */}
+                  {/* Detail grid: up to 5 boxes */}
                   <View style={styles.detailGrid}>
                     <View style={styles.detailBox}>
                       <Text style={styles.detailLabel}>TIME</Text>
@@ -513,6 +509,10 @@ export default function VendorBookingsScreen() {
                       <Text style={styles.detailValue}>
                         {isMobile ? 'Mobile service' : 'At the shop'}
                       </Text>
+                    </View>
+                    <View style={styles.detailBox}>
+                      <Text style={styles.detailLabel}>PAYMENT</Text>
+                      <Text style={styles.detailValue}>{bookingPaymentLabel(booking)}</Text>
                     </View>
                     {isMobile && booking.mobileAddress ? (
                       <View style={styles.detailBox}>
@@ -538,7 +538,6 @@ export default function VendorBookingsScreen() {
                         label="Accept"
                         variant="accent"
                         style={styles.actionButton}
-                        disabled={!payoutReady}
                         onPress={() => accept(booking)}
                       />
                       <AppButton

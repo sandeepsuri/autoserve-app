@@ -42,7 +42,7 @@ export default function VendorProfileScreen() {
     setStartingPayouts(true);
     try {
       const session = await startVendorPayoutOnboarding();
-      await WebBrowser.openAuthSessionAsync(session.url);
+      await WebBrowser.openAuthSessionAsync(session.url, 'autoserve://vendor/profile');
       await queryClient.invalidateQueries({ queryKey: ['vendor-payout-status'] });
     } catch (err) {
       Alert.alert('Could not start payout setup', err instanceof Error ? err.message : String(err));

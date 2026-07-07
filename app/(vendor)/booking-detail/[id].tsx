@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
 import { STATUS_COLORS, STATUS_LABEL } from '@/lib/booking-status';
-import { getBookingById, updateBookingStatus } from '@/lib/bookings';
+import { bookingPaymentLabel, getBookingById, updateBookingStatus } from '@/lib/bookings';
 import { captureBookingPayment, cancelBookingPayment } from '@/lib/payments';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { getCurrentVendorPayoutStatus } from '@/lib/vendor-payouts';
@@ -129,6 +129,7 @@ export default function VendorBookingDetailScreen() {
           { label: 'Subtotal',    value: `$${booking.subtotal.toFixed(2)}` },
           { label: 'Service fee', value: `$${booking.serviceFee.toFixed(2)}` },
           { label: 'Total',       value: `$${booking.total.toFixed(2)}` },
+          { label: 'Payment',     value: bookingPaymentLabel(booking) },
         ]}
       />
 
@@ -154,9 +155,9 @@ export default function VendorBookingDetailScreen() {
         {booking.status === 'pending' ? (
           <>
             {payoutReady ? null : (
-              <Text style={styles.payoutGate}>Finish payout setup to accept paid bookings.</Text>
+              <Text style={styles.payoutGate}>Payouts not set up — the client will pay at the shop.</Text>
             )}
-            <AppButton label={busy ? 'Accepting…' : 'Accept booking'}  variant="accent"    disabled={busy || !payoutReady} onPress={() => mutate('confirmed')} />
+            <AppButton label={busy ? 'Accepting…' : 'Accept booking'}  variant="accent"    disabled={busy} onPress={() => mutate('confirmed')} />
             <AppButton label={busy ? 'Rejecting…' : 'Reject booking'}  variant="secondary" disabled={busy} onPress={() => mutate('cancelled')} />
           </>
         ) : null}
