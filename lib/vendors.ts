@@ -5,6 +5,17 @@ import { DiscoveryFilters, Review, Service, VendorAvailability, VendorSummary } 
 import { loadVendorAvailability } from './vendor-availability';
 import { isDemoDataEnabled, isSupabaseConfigured, supabase } from './supabase';
 
+// Client/guest-facing vendor reads go through the `vendors_public` view, which
+// exposes only these non-sensitive columns — deliberately excluding the Stripe
+// Connect account id and contact PII (contact_name/email/phone), which are
+// owner-only on the base `vendors` table. Kept in sync with
+// supabase/migrations/restrict_vendor_public_columns.sql.
+const VENDOR_PUBLIC_VIEW = 'vendors_public';
+const VENDOR_PUBLIC_COLUMNS =
+  'id,owner_id,business_type,name,description,address,distance_miles,rating,review_count,' +
+  'mobile_service_enabled,service_radius_miles,next_available,hero_image,service_categories,' +
+  'latitude,longitude,business_hours,stripe_transfers_status,stripe_account_updated_at,is_active';
+
 const defaultFilters: DiscoveryFilters = {
   query: '',
   mobileOnly: false,
@@ -33,7 +44,8 @@ function mapVendorRow(item: Record<string, unknown>): VendorSummary {
       latitude: item.latitude as number,
       longitude: item.longitude as number,
     },
-    stripeAccountId: (item.stripe_account_id as string | undefined) ?? undefined,
+    // stripe_account_id is intentionally NOT selected for client-facing reads
+    // (owner-only); see VENDOR_PUBLIC_COLUMNS.
     stripeTransfersStatus: (item.stripe_transfers_status as VendorSummary['stripeTransfersStatus'] | undefined) ?? undefined,
     stripeAccountUpdatedAt: (item.stripe_account_updated_at as string | undefined) ?? undefined,
   };
@@ -87,12 +99,12 @@ export async function listVendors(filters: Partial<DiscoveryFilters> = {}) {
     return isDemoDataEnabled ? filterVendors(useDemoDataStore.getState().vendors, merged) : [];
   }
 
-  const { data, error } = await supabase.from('vendors').select('*').eq('is_active', true);
+  const { data, error } = await supabase.from(VENDOR_PUBLIC_VIEW).select(VENDOR_PUBLIC_COLUMNS).eq('is_active', true);
   if (error) {
     throw new Error(error.message ?? 'Failed to load vendors from Supabase.');
   }
 
-  return filterVendors((data ?? []).map(mapVendorRow), merged);
+  return filterVendors(((data ?? []) as unknown as Record<string, unknown>[]).map(mapVendorRow), merged);
 }
 
 export async function getVendorDetail(vendorId: string): Promise<{
@@ -125,7 +137,7 @@ export async function getVendorDetail(vendorId: string): Promise<{
   }
 
   const [vendorResult, servicesResult, reviewsResult, availability] = await Promise.all([
-    supabase.from('vendors').select('*').eq('id', vendorId).eq('is_active', true).maybeSingle(),
+    supabase.from(VENDOR_PUBLIC_VIEW).select(VENDOR_PUBLIC_COLUMNS).eq('id', vendorId).eq('is_active', true).maybeSingle(),
     supabase.from('services').select('*').eq('vendor_id', vendorId).eq('active', true),
     supabase.from('reviews').select('*').eq('vendor_id', vendorId).order('created_at', { ascending: false }),
     // Client-facing: fall back to an empty (no-slot) availability so an
@@ -155,7 +167,7 @@ export async function getVendorDetail(vendorId: string): Promise<{
     };
   }
 
-  const vendorRow = vendorResult.data as Record<string, unknown>;
+  const vendorRow = vendorResult.data as unknown as Record<string, unknown>;
   const vendor = mapVendorRow(vendorRow);
   const businessHours = Array.isArray(vendorRow.business_hours)
     ? (vendorRow.business_hours as { day: string; hours: string }[])
