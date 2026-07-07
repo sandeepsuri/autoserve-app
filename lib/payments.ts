@@ -1,6 +1,7 @@
 import { BookingRecord } from '@/types/domain';
 
 import { getBookingById, updateBookingStatus } from './bookings';
+import { extractEdgeFunctionError } from './edge-functions';
 import { isSupabaseConfigured, supabase } from './supabase';
 
 export interface BookingPaymentSession {
@@ -22,19 +23,7 @@ async function invokePaymentFunction<T>(name: string, body: Record<string, unkno
 
   const { data, error } = await supabase.functions.invoke(name, { body });
   if (error) {
-    // supabase-js FunctionsHttpError carries the HTTP Response in `context`;
-    // the Edge Function's real message lives in its JSON body, not error.message.
-    let message = error.message;
-    const ctx = (error as { context?: Response }).context;
-    if (ctx && typeof ctx.json === 'function') {
-      try {
-        const body = await ctx.json();
-        if (body?.error) message = body.error;
-      } catch {
-        /* keep default message */
-      }
-    }
-    throw new Error(message || `Payment function ${name} failed`);
+    throw new Error(await extractEdgeFunctionError(error, `Payment function ${name} failed`));
   }
   return data as T;
 }
