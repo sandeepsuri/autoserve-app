@@ -3,10 +3,13 @@
 # dependencies
 node_modules/
 .env*
+!.env.example
 .claude/
 .codex/
+.agents/
 supabase/
 docs/
+skills-lock.json
 # Expo
 .expo/
 dist/

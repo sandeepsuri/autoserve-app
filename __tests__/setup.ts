@@ -10,6 +10,14 @@ jest.mock('expo-web-browser', () => ({
   openAuthSessionAsync: jest.fn(),
 }));
 
+jest.mock('@stripe/stripe-react-native', () => ({
+  StripeProvider: ({ children }: { children: unknown }) => children,
+  useStripe: () => ({
+    initPaymentSheet: jest.fn().mockResolvedValue({}),
+    presentPaymentSheet: jest.fn().mockResolvedValue({}),
+  }),
+}));
+
 if (!global.WebSocket) {
   global.WebSocket = class MockWebSocket {} as unknown as typeof WebSocket;
 }

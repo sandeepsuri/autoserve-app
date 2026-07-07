@@ -10,10 +10,12 @@ export type {
   TimeString,
   TimeBlock,
 } from '@/store/useVendorAvailabilityStore';
+import type { VendorAvailability } from '@/store/useVendorAvailabilityStore';
 
 export type UserRole = 'client' | 'vendor';
 export type BusinessType = 'shop' | 'solo';
 export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type PaymentStatus = 'unpaid' | 'requires_capture' | 'captured' | 'canceled' | 'failed';
 export type BookingMode = 'shop' | 'mobile';
 export type ServiceCategory =
   | 'tire'
@@ -25,6 +27,7 @@ export type ServiceCategory =
   | 'detailing'
   | 'tint';
 export type VendorLocationMode = 'fixed' | 'mobile' | 'hybrid';
+export type VendorStripeTransfersStatus = 'inactive' | 'pending' | 'active';
 export type VendorApplicationStatus =
   | 'draft'
   | 'submitted'
@@ -70,6 +73,9 @@ export interface VendorSummary {
   heroImage: string;
   serviceCategories: ServiceCategory[];
   coordinates: Coordinates;
+  stripeAccountId?: string;
+  stripeTransfersStatus?: VendorStripeTransfersStatus;
+  stripeAccountUpdatedAt?: string;
 }
 
 export interface Service {
@@ -121,6 +127,8 @@ export interface VendorOnboardingDraft {
   services: VendorOnboardingServiceDraft[];
   /** Availability is captured in the onboarding availability step */
   availabilityConfigured?: boolean;
+  /** The configured weekly availability, persisted on submit and materialized on approval */
+  availability?: VendorAvailability;
   completed: boolean;
   submittedAt?: string;
   reviewerNotes?: string;
@@ -212,6 +220,7 @@ export interface BookingDraft {
   vehicleModel?: string;
   vehicleYear?: string;
   bookingMode?: BookingMode;
+  paymentMethod?: 'online' | 'shop';
   scheduledDate?: string;
   scheduledTime?: string;
   mobileAddress?: string;
@@ -241,6 +250,9 @@ export interface BookingRecord {
   serviceFee: number;
   total: number;
   totalPrice: number;
+  stripePaymentIntentId?: string;
+  paymentStatus?: PaymentStatus;
+  applicationFeeAmount?: number;
   createdAt: string;
   updatedAt?: string;
 }

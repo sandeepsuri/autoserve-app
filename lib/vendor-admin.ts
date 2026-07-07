@@ -45,6 +45,9 @@ export async function getVendorForOwner(): Promise<VendorSummary | null> {
       latitude: data.latitude,
       longitude: data.longitude,
     },
+    stripeAccountId: data.stripe_account_id ?? undefined,
+    stripeTransfersStatus: data.stripe_transfers_status ?? undefined,
+    stripeAccountUpdatedAt: data.stripe_account_updated_at ?? undefined,
   };
 }
 

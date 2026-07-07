@@ -2,6 +2,7 @@ import { ensureProfileRow } from './auth';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
+import { useVendorAvailabilityStore } from '@/store/useVendorAvailabilityStore';
 import {
   BusinessType,
   Coordinates,
@@ -71,6 +72,7 @@ type VendorApplicationRow = {
   longitude: number | null;
   service_radius_miles: number | null;
   service_catalog: unknown;
+  availability: unknown;
   submitted_at: string | null;
   reviewer_notes: string | null;
   updated_at: string | null;
@@ -269,6 +271,7 @@ function rowToDraft(row: VendorApplicationRow, profile?: UserProfile | null): Ve
       serviceRadiusMiles: row.service_radius_miles ?? undefined,
     },
     services: coerceServiceCatalog(row.service_catalog),
+    availability: (row.availability as VendorOnboardingDraft['availability']) ?? undefined,
     completed: isSubmitted || Boolean(row.submitted_at),
     submittedAt: row.submitted_at ?? undefined,
     reviewerNotes: row.reviewer_notes ?? undefined,
@@ -291,6 +294,7 @@ function draftToApplicationRow(draft: VendorOnboardingDraft): Omit<VendorApplica
     longitude: draft.location.coordinates?.longitude ?? null,
     service_radius_miles: draft.location.serviceRadiusMiles ?? null,
     service_catalog: draft.services,
+    availability: draft.availability ?? null,
     submitted_at: draft.submittedAt ?? null,
   };
 }
@@ -470,6 +474,10 @@ export async function submitVendorOnboarding(patch?: VendorOnboardingDraftPatch)
     completed: true,
     submittedAt: new Date().toISOString(),
   });
+  // Availability is edited in a separate store during onboarding; capture it
+  // onto the draft so it persists to the application and is materialized into a
+  // real vendor_availability row on approval.
+  draft.availability = useVendorAvailabilityStore.getState().availability;
 
   const errors = validateSubmission(draft);
   if (errors.length) {

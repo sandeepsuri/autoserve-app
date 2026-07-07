@@ -9,7 +9,7 @@
 
 import {
   deriveAvailableSlots,
-  makeDefaultAvailability,
+  makeEmptyAvailability,
   VendorAvailability,
 } from '@/store/useVendorAvailabilityStore';
 
@@ -112,7 +112,9 @@ async function _deriveSlotsFallback(
   from?:    string,
   to?:      string,
 ): Promise<BookableSlot[]> {
-  const availability = await loadVendorAvailability(vendorId).catch(() => makeDefaultAvailability());
+  const availability = await loadVendorAvailability(vendorId, { fallback: 'empty' }).catch(() =>
+    makeEmptyAvailability(),
+  );
 
   const today  = new Date();
   today.setHours(0, 0, 0, 0);

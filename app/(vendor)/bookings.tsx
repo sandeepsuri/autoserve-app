@@ -19,8 +19,10 @@ import { FilterChip } from '@/components/FilterChip';
 import { Screen } from '@/components/Screen';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { STATUS_COLORS, STATUS_LABEL } from '@/lib/booking-status';
-import { listBookingsForVendorOwner, updateBookingStatus } from '@/lib/bookings';
+import { bookingPaymentLabel, listBookingsForVendorOwner } from '@/lib/bookings';
 import { formatScheduledEST } from '@/lib/format';
+import { captureBookingPayment, cancelBookingPayment } from '@/lib/payments';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { getVendorForOwner } from '@/lib/vendor-admin';
 import { loadVendorAvailability } from '@/lib/vendor-availability';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -183,7 +185,7 @@ export default function VendorBookingsScreen() {
       const vendor = await getVendorForOwner();
       if (!vendor) return null;
       const availability = await loadVendorAvailability(vendor.id);
-      return { vendorId: vendor.id, availability };
+      return { vendorId: vendor.id, vendor, availability };
     },
     enabled: userId !== 'anon',
   });
@@ -226,6 +228,7 @@ export default function VendorBookingsScreen() {
   const countOf = (s: StatusTab) => bookings.filter((b) => b.status === s).length;
   const pendingCount = countOf('pending');
   const confirmedCount = countOf('confirmed');
+  const payoutReady = !isSupabaseConfigured || vendorAvailability?.vendor?.stripeTransfersStatus === 'active';
 
   // Expected earnings: sum of total across pending + confirmed bookings
   const expectedEarnings = bookings
@@ -253,7 +256,7 @@ export default function VendorBookingsScreen() {
 
   const accept = async (booking: BookingRecord) => {
     try {
-      await updateBookingStatus(booking.id, 'confirmed');
+      await captureBookingPayment(booking.id);
       await invalidateAll(booking.id);
     } catch (err) {
       Alert.alert('Could not accept booking', err instanceof Error ? err.message : String(err));
@@ -262,7 +265,7 @@ export default function VendorBookingsScreen() {
 
   const reject = async (booking: BookingRecord) => {
     try {
-      await updateBookingStatus(booking.id, 'cancelled');
+      await cancelBookingPayment(booking.id);
       await invalidateAll(booking.id);
     } catch (err) {
       Alert.alert('Could not reject booking', err instanceof Error ? err.message : String(err));
@@ -309,6 +312,21 @@ export default function VendorBookingsScreen() {
           </View>
         </View>
       </View>
+
+      {!payoutReady && pendingCount > 0 ? (
+        <AppCard style={styles.payoutGateCard}>
+          <Text style={styles.payoutGateTitle}>Payouts not set up</Text>
+          <Text style={styles.payoutGateBody}>
+            You can still accept bookings — clients will pay at the shop. Set up payouts to accept in-app payments.
+          </Text>
+          <AppButton
+            label="Set up payouts"
+            variant="accent"
+            style={styles.payoutGateButton}
+            onPress={() => router.push('/(vendor)/profile')}
+          />
+        </AppCard>
+      ) : null}
 
       <View style={styles.primaryToggle} accessibilityRole="tablist">
         {(['queue', 'schedule'] as PrimaryView[]).map((view) => {
@@ -474,7 +492,7 @@ export default function VendorBookingsScreen() {
                     )}
                   </View>
 
-                  {/* Detail grid: up to 4 boxes */}
+                  {/* Detail grid: up to 5 boxes */}
                   <View style={styles.detailGrid}>
                     <View style={styles.detailBox}>
                       <Text style={styles.detailLabel}>TIME</Text>
@@ -491,6 +509,10 @@ export default function VendorBookingsScreen() {
                       <Text style={styles.detailValue}>
                         {isMobile ? 'Mobile service' : 'At the shop'}
                       </Text>
+                    </View>
+                    <View style={styles.detailBox}>
+                      <Text style={styles.detailLabel}>PAYMENT</Text>
+                      <Text style={styles.detailValue}>{bookingPaymentLabel(booking)}</Text>
                     </View>
                     {isMobile && booking.mobileAddress ? (
                       <View style={styles.detailBox}>
@@ -846,6 +868,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 14,
     color: '#CBD5E1',
+  },
+  payoutGateCard: {
+    gap: spacing.xs,
+    borderColor: colors.danger,
+  },
+  payoutGateTitle: {
+    ...typography.labelLg,
+    color: colors.danger,
+  },
+  payoutGateBody: {
+    ...typography.bodyMd,
+    color: colors.textSecondary,
+  },
+  payoutGateButton: {
+    marginTop: spacing.sm,
   },
   primaryToggle: {
     minHeight: 48,

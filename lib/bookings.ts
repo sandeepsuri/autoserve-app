@@ -16,6 +16,15 @@ function toIsoTimestamp(date: string, time: string): string {
   return `${date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
 }
 
+function toNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
 // ─── Selectors (sync, demo-store only) ───────────────────────────────────────
 
 export function getBookingsForClient(clientId: string): BookingRecord[] {
@@ -50,7 +59,7 @@ function rowToRecord(item: Record<string, unknown>): BookingRecord {
     ? (item.services_snapshot as BookingServiceSnapshot[])
     : [];
 
-  const total = typeof item.total === 'number' ? item.total : 0;
+  const total = toNumber(item.total);
 
   return {
     id: item.id as string,
@@ -70,13 +79,28 @@ function rowToRecord(item: Record<string, unknown>): BookingRecord {
     status: item.status as BookingRecord['status'],
     notes: (item.notes as string | undefined) ?? undefined,
     photos: Array.isArray(item.photos) ? (item.photos as string[]) : [],
-    subtotal: item.subtotal as number,
-    serviceFee: item.service_fee as number,
+    subtotal: toNumber(item.subtotal),
+    serviceFee: toNumber(item.service_fee),
     total,
     totalPrice: total,
+    stripePaymentIntentId: (item.stripe_payment_intent_id as string | undefined) ?? undefined,
+    paymentStatus: (item.payment_status as BookingRecord['paymentStatus'] | undefined) ?? undefined,
+    applicationFeeAmount:
+      item.application_fee_amount === null || item.application_fee_amount === undefined
+        ? undefined
+        : toNumber(item.application_fee_amount),
     createdAt: item.created_at as string,
     updatedAt: (item.updated_at as string | undefined) ?? undefined,
   };
+}
+
+// How the client pays for a booking: in-app via Stripe when a payment intent
+// exists, otherwise directly at the vendor (vendor wasn't payout-ready when
+// the booking was created).
+export function bookingPaymentLabel(booking: Pick<BookingRecord, 'paymentStatus'>): string {
+  if (booking.paymentStatus === 'captured') return 'Paid online';
+  if (booking.paymentStatus === 'requires_capture') return 'Paid online · held';
+  return 'Pay at shop';
 }
 
 // ─── List ─────────────────────────────────────────────────────────────────────

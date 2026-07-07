@@ -16,6 +16,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { useStripe } from '@stripe/stripe-react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -31,7 +32,9 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { createBookingFromSelections } from '@/lib/bookings';
 import { ensureProfileRow } from '@/lib/auth';
+import { cancelUnpaidBookingAfterPaymentFailure, createBookingPayment } from '@/lib/payments';
 import { queryClient } from '@/lib/query-client';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { getVendorDetail } from '@/lib/vendors';
 import { listVehicles } from '@/lib/vehicles';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -40,7 +43,7 @@ import {
   deriveAvailableSlots,
   formatTimeDisplay,
   isDateFullyBooked,
-  useVendorAvailabilityStore,
+  makeEmptyAvailability,
 } from '@/store/useVendorAvailabilityStore';
 import { Service } from '@/types/domain';
 
@@ -138,10 +141,11 @@ function getUpcomingDateOptions(): { value: string; label: string; monthLabel: s
 
 export default function BookingScheduleScreen() {
   const router = useRouter();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const insets = useSafeAreaInsets();
   const { draft, clearDraft, updateDraft } = useBookingDraftStore();
   const { session, profile, guestMode, guestClientId, setPostAuthPath } = useAuthStore();
-  const { availability } = useVendorAvailabilityStore();
+  const [confirming, setConfirming] = useState(false);
 
   const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
 
@@ -159,8 +163,9 @@ export default function BookingScheduleScreen() {
 
   const vendor = data?.vendor;
   const services = data?.services ?? [];
-  // Use server-loaded availability when available; fall back to store (demo/offline)
-  const vendorAvailability = data?.availability ?? availability;
+  // Use server-loaded availability only; an unconfigured vendor yields an empty
+  // (no-slot) availability so we show the honest "no availability" state.
+  const vendorAvailability = data?.availability ?? makeEmptyAvailability();
   const selectedServiceIds = draft.serviceIds ?? [];
   const selectedServices = services.filter((service) =>
     selectedServiceIds.includes(service.id),
@@ -168,6 +173,11 @@ export default function BookingScheduleScreen() {
   const subtotal = selectedServices.reduce((sum, s) => sum + s.price, 0);
   const serviceFee = Math.round(subtotal * 0.12 * 100) / 100;
   const total = Math.round((subtotal + serviceFee) * 100) / 100;
+
+  // In-app payment is only offered when the vendor has active Stripe
+  // transfers; otherwise the client pays the vendor directly at the shop.
+  const onlinePaymentAvailable = isSupabaseConfigured && vendor?.stripeTransfersStatus === 'active';
+  const paymentMethod: 'online' | 'shop' = onlinePaymentAvailable ? draft.paymentMethod ?? 'online' : 'shop';
 
   const selectedDateForInitialMonth = draft.scheduledDate
     ? fromDateIso(draft.scheduledDate)
@@ -310,7 +320,7 @@ export default function BookingScheduleScreen() {
   };
 
   const confirmBooking = async () => {
-    if (!canConfirm) return;
+    if (!canConfirm || confirming) return;
 
     if (!session) {
       setPostAuthPath('/(client)/booking/vehicle');
@@ -324,6 +334,7 @@ export default function BookingScheduleScreen() {
     }
 
     await ensureProfileRow();
+    setConfirming(true);
 
     try {
       const vehicleId = draft.vehicleId;
@@ -346,6 +357,30 @@ export default function BookingScheduleScreen() {
         clientName: profile?.fullName,
       });
 
+      if (isSupabaseConfigured && paymentMethod === 'online') {
+        const payment = await createBookingPayment(booking.id);
+        // When the vendor hasn't completed payout setup, payment is skipped and
+        // the booking proceeds unpaid.
+        if (payment.paymentRequired && payment.clientSecret) {
+          const initResult = await initPaymentSheet({
+            merchantDisplayName: 'AutoServe',
+            paymentIntentClientSecret: payment.clientSecret,
+            returnURL: 'autoserve://stripe-redirect',
+          });
+
+          if (initResult.error) {
+            await cancelUnpaidBookingAfterPaymentFailure(booking.id);
+            throw new Error(initResult.error.message);
+          }
+
+          const paymentResult = await presentPaymentSheet();
+          if (paymentResult.error) {
+            await cancelUnpaidBookingAfterPaymentFailure(booking.id);
+            throw new Error(paymentResult.error.message);
+          }
+        }
+      }
+
       clearDraft();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['client-bookings'] }),
@@ -359,6 +394,8 @@ export default function BookingScheduleScreen() {
       });
     } catch (err) {
       Alert.alert('Booking failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -590,6 +627,33 @@ export default function BookingScheduleScreen() {
           )}
         </AppCard>
 
+        <AppCard style={styles.card}>
+          <SectionHeader
+            title="Payment"
+            actionLabel={paymentMethod === 'online' ? 'Pay online' : 'Pay at shop'}
+          />
+          {onlinePaymentAvailable ? (
+            <View style={styles.paymentOptions}>
+              <PaymentOptionRow
+                title="Pay online now"
+                body="Your card is authorized now and only charged when the vendor accepts the booking."
+                selected={paymentMethod === 'online'}
+                onPress={() => updateDraft({ paymentMethod: 'online' })}
+              />
+              <PaymentOptionRow
+                title="Pay at the shop"
+                body="Pay the vendor directly once the service is done."
+                selected={paymentMethod === 'shop'}
+                onPress={() => updateDraft({ paymentMethod: 'shop' })}
+              />
+            </View>
+          ) : (
+            <Text style={styles.paymentInfoText}>
+              This vendor takes payment directly — pay at the shop when the service is done.
+            </Text>
+          )}
+        </AppCard>
+
         {!canConfirm ? (
           <Text style={styles.validationText}>
             Select at least one service, a date, and a time slot before confirming.
@@ -619,13 +683,43 @@ export default function BookingScheduleScreen() {
           </View>
         </View>
         <AppButton
-          label={session ? 'Book Appointment' : 'Sign In to Confirm'}
+          label={confirming ? 'Confirming...' : session ? 'Book Appointment' : 'Sign In to Confirm'}
           variant="accent"
-          disabled={!canConfirm}
+          disabled={!canConfirm || confirming}
           onPress={confirmBooking}
         />
       </View>
     </SafeAreaView>
+  );
+}
+
+function PaymentOptionRow({
+  title,
+  body,
+  selected,
+  onPress,
+}: {
+  title: string;
+  body: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.serviceRow, selected && styles.serviceRowSelected, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={title}
+    >
+      <View style={styles.serviceCopy}>
+        <Text style={styles.serviceTitle}>{title}</Text>
+        <Text style={styles.serviceDescription}>{body}</Text>
+      </View>
+      <View style={[styles.paymentRadio, selected && styles.paymentRadioSelected]}>
+        {selected ? <View style={styles.paymentRadioDot} /> : null}
+      </View>
+    </Pressable>
   );
 }
 
@@ -1009,6 +1103,31 @@ const styles = StyleSheet.create({
   validationText: {
     ...typography.caption,
     color: colors.pending,
+  },
+  paymentOptions: {
+    gap: spacing.sm,
+  },
+  paymentInfoText: {
+    ...typography.bodyMd,
+    color: colors.textSecondary,
+  },
+  paymentRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.borderDefault,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentRadioSelected: {
+    borderColor: colors.bgStrong,
+  },
+  paymentRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.bgStrong,
   },
   bookingBar: {
     position: 'absolute',

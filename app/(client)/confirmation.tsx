@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { AppHeader } from '@/components/AppHeader';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
-import { getBookingById } from '@/lib/bookings';
+import { bookingPaymentLabel, getBookingById } from '@/lib/bookings';
 
 export default function ConfirmationScreen() {
   const router = useRouter();
@@ -62,6 +62,7 @@ export default function ConfirmationScreen() {
           { label: 'Tracking', value: 'Follow status changes in My Bookings' },
           { label: 'Service type', value: booking?.bookingMode === 'mobile' ? 'Mobile Service' : 'Shop Visit' },
           { label: 'Estimate', value: booking ? `$${booking.total.toFixed(2)}` : 'Loading total…' },
+          { label: 'Payment', value: booking ? bookingPaymentLabel(booking) : 'Loading…' },
         ]}
       />
 

@@ -176,6 +176,36 @@ export function makeDefaultAvailability(): VendorAvailability {
   };
 }
 
+/**
+ * An availability with no bookable days — used as the client-facing fallback
+ * when a vendor has no real `vendor_availability` row, so the UI honestly shows
+ * "no availability" instead of fabricated slots.
+ */
+export function makeEmptyAvailability(): VendorAvailability {
+  const closed: DayRule = { bookable: false, openTime: '09:00', closeTime: '17:00' };
+  return {
+    weeklyRules: {
+      0: { ...closed },
+      1: { ...closed },
+      2: { ...closed },
+      3: { ...closed },
+      4: { ...closed },
+      5: { ...closed },
+      6: { ...closed },
+    },
+    slotLengthMinutes: 30,
+    capacityPerSlot: 1,
+    blockedPeriods: [],
+    serviceModeRules: {
+      shopVisitsEnabled: false,
+      mobileServiceEnabled: false,
+      sameDayBookingEnabled: false,
+      sameDayLeadHours: 2,
+    },
+    quickControls: {},
+  };
+}
+
 // --- Selectors / utilities --------------------------------------------------
 
 /**

@@ -1,5 +1,5 @@
 import { demoReviewsState, useDemoDataStore } from '@/store/useDemoDataStore';
-import { makeDefaultAvailability } from '@/store/useVendorAvailabilityStore';
+import { makeDefaultAvailability, makeEmptyAvailability } from '@/store/useVendorAvailabilityStore';
 import { DiscoveryFilters, Review, Service, VendorAvailability, VendorSummary } from '@/types/domain';
 
 import { loadVendorAvailability } from './vendor-availability';
@@ -33,6 +33,9 @@ function mapVendorRow(item: Record<string, unknown>): VendorSummary {
       latitude: item.latitude as number,
       longitude: item.longitude as number,
     },
+    stripeAccountId: (item.stripe_account_id as string | undefined) ?? undefined,
+    stripeTransfersStatus: (item.stripe_transfers_status as VendorSummary['stripeTransfersStatus'] | undefined) ?? undefined,
+    stripeAccountUpdatedAt: (item.stripe_account_updated_at as string | undefined) ?? undefined,
   };
 }
 
@@ -125,7 +128,9 @@ export async function getVendorDetail(vendorId: string): Promise<{
     supabase.from('vendors').select('*').eq('id', vendorId).eq('is_active', true).maybeSingle(),
     supabase.from('services').select('*').eq('vendor_id', vendorId).eq('active', true),
     supabase.from('reviews').select('*').eq('vendor_id', vendorId).order('created_at', { ascending: false }),
-    loadVendorAvailability(vendorId).catch(() => makeDefaultAvailability()),
+    // Client-facing: fall back to an empty (no-slot) availability so an
+    // unconfigured vendor shows "no availability" instead of fabricated slots.
+    loadVendorAvailability(vendorId, { fallback: 'empty' }).catch(() => makeEmptyAvailability()),
   ]);
 
   if (vendorResult.error) {

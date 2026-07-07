@@ -10,7 +10,8 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
 import { STATUS_COLORS, STATUS_LABEL } from '@/lib/booking-status';
-import { getBookingById, updateBookingStatus } from '@/lib/bookings';
+import { getBookingById } from '@/lib/bookings';
+import { cancelBookingPayment } from '@/lib/payments';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -59,7 +60,7 @@ export default function BookingDetailScreen() {
   const handleCancel = async () => {
     setCancelling(true);
     try {
-      await updateBookingStatus(booking.id, 'cancelled');
+      await cancelBookingPayment(booking.id);
       await queryClient.invalidateQueries({ queryKey: ['booking-detail', id] });
       await queryClient.invalidateQueries({ queryKey: ['client-bookings'] });
       router.back();

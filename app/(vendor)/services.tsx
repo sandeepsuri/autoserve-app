@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   Alert,
@@ -160,7 +160,7 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
   });
 
   // Sync defaults when editTarget changes (modal is reused)
-  useMemo(() => {
+  useEffect(() => {
     reset({
       title: editTarget?.title ?? '',
       category: editTarget?.category ?? 'oil',
