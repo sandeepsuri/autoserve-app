@@ -220,6 +220,7 @@ export interface BookingDraft {
   vehicleModel?: string;
   vehicleYear?: string;
   bookingMode?: BookingMode;
+  paymentMethod?: 'online' | 'shop';
   scheduledDate?: string;
   scheduledTime?: string;
   mobileAddress?: string;

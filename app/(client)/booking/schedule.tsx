@@ -174,6 +174,11 @@ export default function BookingScheduleScreen() {
   const serviceFee = Math.round(subtotal * 0.12 * 100) / 100;
   const total = Math.round((subtotal + serviceFee) * 100) / 100;
 
+  // In-app payment is only offered when the vendor has active Stripe
+  // transfers; otherwise the client pays the vendor directly at the shop.
+  const onlinePaymentAvailable = isSupabaseConfigured && vendor?.stripeTransfersStatus === 'active';
+  const paymentMethod: 'online' | 'shop' = onlinePaymentAvailable ? draft.paymentMethod ?? 'online' : 'shop';
+
   const selectedDateForInitialMonth = draft.scheduledDate
     ? fromDateIso(draft.scheduledDate)
     : addDays(startOfDay(new Date()), 1);
@@ -352,7 +357,7 @@ export default function BookingScheduleScreen() {
         clientName: profile?.fullName,
       });
 
-      if (isSupabaseConfigured) {
+      if (isSupabaseConfigured && paymentMethod === 'online') {
         const payment = await createBookingPayment(booking.id);
         // When the vendor hasn't completed payout setup, payment is skipped and
         // the booking proceeds unpaid.
@@ -622,6 +627,33 @@ export default function BookingScheduleScreen() {
           )}
         </AppCard>
 
+        <AppCard style={styles.card}>
+          <SectionHeader
+            title="Payment"
+            actionLabel={paymentMethod === 'online' ? 'Pay online' : 'Pay at shop'}
+          />
+          {onlinePaymentAvailable ? (
+            <View style={styles.paymentOptions}>
+              <PaymentOptionRow
+                title="Pay online now"
+                body="Your card is authorized now and only charged when the vendor accepts the booking."
+                selected={paymentMethod === 'online'}
+                onPress={() => updateDraft({ paymentMethod: 'online' })}
+              />
+              <PaymentOptionRow
+                title="Pay at the shop"
+                body="Pay the vendor directly once the service is done."
+                selected={paymentMethod === 'shop'}
+                onPress={() => updateDraft({ paymentMethod: 'shop' })}
+              />
+            </View>
+          ) : (
+            <Text style={styles.paymentInfoText}>
+              This vendor takes payment directly — pay at the shop when the service is done.
+            </Text>
+          )}
+        </AppCard>
+
         {!canConfirm ? (
           <Text style={styles.validationText}>
             Select at least one service, a date, and a time slot before confirming.
@@ -658,6 +690,36 @@ export default function BookingScheduleScreen() {
         />
       </View>
     </SafeAreaView>
+  );
+}
+
+function PaymentOptionRow({
+  title,
+  body,
+  selected,
+  onPress,
+}: {
+  title: string;
+  body: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.serviceRow, selected && styles.serviceRowSelected, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={title}
+    >
+      <View style={styles.serviceCopy}>
+        <Text style={styles.serviceTitle}>{title}</Text>
+        <Text style={styles.serviceDescription}>{body}</Text>
+      </View>
+      <View style={[styles.paymentRadio, selected && styles.paymentRadioSelected]}>
+        {selected ? <View style={styles.paymentRadioDot} /> : null}
+      </View>
+    </Pressable>
   );
 }
 
@@ -1041,6 +1103,31 @@ const styles = StyleSheet.create({
   validationText: {
     ...typography.caption,
     color: colors.pending,
+  },
+  paymentOptions: {
+    gap: spacing.sm,
+  },
+  paymentInfoText: {
+    ...typography.bodyMd,
+    color: colors.textSecondary,
+  },
+  paymentRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.borderDefault,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentRadioSelected: {
+    borderColor: colors.bgStrong,
+  },
+  paymentRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.bgStrong,
   },
   bookingBar: {
     position: 'absolute',
