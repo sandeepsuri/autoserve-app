@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -38,12 +38,11 @@ export default function BookingDetailsScreen() {
   const { session, guestClientId } = useAuthStore();
   const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
 
-  const seeded = useRef(false);
+  // Default the mode to 'shop' until the user picks one. Keyed on draft state
+  // (not a mount-once ref) so it re-seeds after clearDraft() when this screen
+  // instance is reused for a subsequent booking.
   useEffect(() => {
-    if (!seeded.current && !draft.bookingMode) {
-      seeded.current = true;
-      updateDraft({ bookingMode: 'shop' });
-    }
+    if (!draft.bookingMode) updateDraft({ bookingMode: 'shop' });
   }, [draft.bookingMode, updateDraft]);
   const { data, isLoading } = useQuery({
     queryKey: ['booking-vendor-details', draft.vendorId],
@@ -70,7 +69,7 @@ export default function BookingDetailsScreen() {
       : `${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model}`
     : null;
 
-  const canContinue = Boolean(vendor && hasCurrentOwnerVehicle && selectedMode);
+  const canContinue = Boolean(vendor && hasCurrentOwnerVehicle && draft.bookingMode);
 
   if (!draft.vendorId) {
     return (
