@@ -20,7 +20,7 @@ import { Screen } from '@/components/Screen';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { STATUS_COLORS, STATUS_LABEL } from '@/lib/booking-status';
 import { bookingPaymentLabel, listBookingsForVendorOwner } from '@/lib/bookings';
-import { formatScheduledEST } from '@/lib/format';
+import { addDays, formatScheduledEST, startOfDay, toDateKey } from '@/lib/format';
 import { captureBookingPayment, cancelBookingPayment } from '@/lib/payments';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { getVendorForOwner } from '@/lib/vendor-admin';
@@ -38,26 +38,6 @@ type ScheduledBooking = {
   startsAt: Date;
   dateKey: string;
 };
-
-function pad2(value: number) {
-  return String(value).padStart(2, '0');
-}
-
-function toDateKey(date: Date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
-}
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
 
 function addMonths(date: Date, months: number) {
   const next = new Date(date);

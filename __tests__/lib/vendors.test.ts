@@ -166,6 +166,40 @@ describe('listVendors — snake_case to camelCase mapping', () => {
   });
 });
 
+// ─── Sensitive-column exposure guard (F1) ──────────────────────────────────────
+
+describe('listVendors — does not expose vendor Stripe/PII columns to clients', () => {
+  it('never maps stripe_account_id into the client VendorSummary', async () => {
+    // Even if a row somehow carries the sensitive column, the client mapping
+    // must drop it (the query also excludes it via VENDOR_PUBLIC_COLUMNS).
+    mockFrom.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        eq: jest.fn().mockResolvedValue({
+          data: [{ ...toDbRow(makeVendor()), stripe_account_id: 'acct_LEAK', contact_email: 'x@y.z' }],
+          error: null,
+        }),
+      }),
+    });
+    const [v] = await listVendors();
+    expect((v as unknown as Record<string, unknown>).stripeAccountId).toBeUndefined();
+  });
+
+  it('selects an explicit column list that omits stripe_account_id and contact PII', async () => {
+    const select = jest.fn().mockReturnValue({
+      eq: jest.fn().mockResolvedValue({ data: [], error: null }),
+    });
+    mockFrom.mockReturnValue({ select });
+    await listVendors();
+    const selectedColumns = select.mock.calls[0][0] as string;
+    expect(selectedColumns).not.toContain('stripe_account_id');
+    expect(selectedColumns).not.toContain('contact_email');
+    expect(selectedColumns).not.toContain('contact_phone');
+    // sanity: still selects the fields the UI needs
+    expect(selectedColumns).toContain('name');
+    expect(selectedColumns).toContain('stripe_transfers_status');
+  });
+});
+
 // ─── getVendorDetail ──────────────────────────────────────────────────────────
 
 const makeChain = (overrides: Record<string, unknown> = {}) => {
@@ -182,11 +216,13 @@ const makeChain = (overrides: Record<string, unknown> = {}) => {
 // ─── ticket 06: discovery only exposes active vendors ──────────────────────────
 
 describe('active-vendor gating (ticket 06)', () => {
-  it('listVendors only requests active vendors (is_active = true)', async () => {
+  it('listVendors reads the non-sensitive vendors_public view, active only', async () => {
     const eq = jest.fn().mockResolvedValue({ data: [], error: null });
     mockFrom.mockReturnValue({ select: jest.fn().mockReturnValue({ eq }) });
     await listVendors();
-    expect(mockFrom).toHaveBeenCalledWith('vendors');
+    // Discovery must go through the curated view, never the base `vendors` table
+    // (which carries stripe_account_id + contact PII).
+    expect(mockFrom).toHaveBeenCalledWith('vendors_public');
     expect(eq).toHaveBeenCalledWith('is_active', true);
   });
 

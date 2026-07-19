@@ -32,6 +32,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { createBookingFromSelections } from '@/lib/bookings';
 import { ensureProfileRow } from '@/lib/auth';
+import { addDays, startOfDay, toDateKey } from '@/lib/format';
 import { cancelUnpaidBookingAfterPaymentFailure, createBookingPayment } from '@/lib/payments';
 import { queryClient } from '@/lib/query-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -66,29 +67,10 @@ type DateState = {
   hasSlots: boolean;
 };
 
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
 function addMonths(date: Date, months: number) {
   const next = new Date(date);
   next.setMonth(next.getMonth() + months, 1);
   return startOfDay(next);
-}
-
-function toDateIso(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 function fromDateIso(dateIso: string) {
@@ -130,7 +112,7 @@ function getUpcomingDateOptions(): { value: string; label: string; monthLabel: s
   return Array.from({ length: DATE_WINDOW }, (_, index) => {
     const date = new Date(today);
     date.setDate(date.getDate() + index + 1);
-    const iso = toDateIso(date);
+    const iso = toDateKey(date);
     return {
       value: iso,
       label: index === 0 ? 'Tomorrow' : formatFullDate(iso),
@@ -163,6 +145,7 @@ export default function BookingScheduleScreen() {
 
   const vendor = data?.vendor;
   const services = data?.services ?? [];
+
   // Use server-loaded availability only; an unconfigured vendor yields an empty
   // (no-slot) availability so we show the honest "no availability" state.
   const vendorAvailability = data?.availability ?? makeEmptyAvailability();
@@ -215,7 +198,7 @@ export default function BookingScheduleScreen() {
       return {
         ...opt,
         day: fromDateIso(opt.value).getDate(),
-        isToday: opt.value === toDateIso(startOfDay(new Date())),
+        isToday: opt.value === toDateKey(startOfDay(new Date())),
         isInDisplayedMonth: true,
         isOutOfWindow: false,
         isClosed,
@@ -239,7 +222,7 @@ export default function BookingScheduleScreen() {
     const firstGridDate = addDays(firstOfMonth, -firstOfMonth.getDay());
     return Array.from({ length: 42 }, (_, index): DateState => {
       const cellDate = addDays(firstGridDate, index);
-      const value = toDateIso(cellDate);
+      const value = toDateKey(cellDate);
       const existingState = dateStateByValue.get(value);
       const isOutOfWindow = cellDate < bookingStart || cellDate > bookingEnd;
       if (existingState) {
@@ -255,7 +238,7 @@ export default function BookingScheduleScreen() {
         day: cellDate.getDate(),
         label: formatFullDate(value),
         monthLabel: formatMonthYear(cellDate),
-        isToday: value === toDateIso(startOfDay(new Date())),
+        isToday: value === toDateKey(startOfDay(new Date())),
         isInDisplayedMonth: sameMonth(cellDate, visibleMonth),
         isOutOfWindow: true,
         isClosed: true,

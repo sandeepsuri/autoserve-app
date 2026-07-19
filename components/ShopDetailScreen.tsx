@@ -80,7 +80,10 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
       setGuestMode(true);
     }
     clearDraft();
-    updateDraft({ vendorId: vendor.id });
+    // Seed a default booking mode at entry so the draft always carries a valid
+    // mode, even if the service step's effect hasn't run yet (the user can still
+    // change it there).
+    updateDraft({ vendorId: vendor.id, bookingMode: 'shop' });
     router.push('/(client)/booking/vehicle');
   };
 
