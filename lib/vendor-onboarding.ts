@@ -434,21 +434,6 @@ export async function saveVendorOnboardingDraft(patch: VendorOnboardingDraftPatc
   return draft;
 }
 
-export async function saveVendorOnboardingProfileDraft(profile: VendorOnboardingDraftPatch['profile'], businessType?: BusinessType) {
-  return saveVendorOnboardingDraft({
-    businessType,
-    profile,
-  });
-}
-
-export async function saveVendorOnboardingLocationDraft(location: VendorOnboardingDraftPatch['location']) {
-  return saveVendorOnboardingDraft({ location });
-}
-
-export async function saveVendorOnboardingServicesDraft(services: VendorOnboardingServiceDraft[]) {
-  return saveVendorOnboardingDraft({ services });
-}
-
 export async function submitVendorOnboarding(patch?: VendorOnboardingDraftPatch): Promise<VendorOnboardingDraft> {
   const { session, profile } = requireSession();
   await ensureProfileRow();

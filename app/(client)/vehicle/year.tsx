@@ -62,10 +62,6 @@ export default function VehicleYearScreen() {
 }
 
 const styles = StyleSheet.create({
-  subtitle: {
-    ...typography.bodyMd,
-    color: colors.textSecondary,
-  },
   loader: {
     marginTop: spacing.xl,
   },

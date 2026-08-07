@@ -328,17 +328,6 @@ export function deriveAvailableSlots(
 }
 
 /**
- * Check whether a date is open (has at least one available slot).
- */
-export function isDateOpen(
-  dateIso: string,
-  availability: VendorAvailability,
-  bookedSlots: string[] = [],
-): boolean {
-  return deriveAvailableSlots(dateIso, availability, bookedSlots).length > 0;
-}
-
-/**
  * Check whether a date is fully booked (bookable but all slots at capacity).
  */
 export function isDateFullyBooked(
@@ -419,7 +408,7 @@ interface VendorAvailabilityState {
 
 export const useVendorAvailabilityStore = create<VendorAvailabilityState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       availability: makeDefaultAvailability(),
       draft: null,
       focusedDate: null,

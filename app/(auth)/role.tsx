@@ -69,10 +69,6 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
   },
-  subtitle: {
-    ...typography.bodyMd,
-    color: colors.textSecondary,
-  },
   card: {
     gap: spacing.lg,
   },
