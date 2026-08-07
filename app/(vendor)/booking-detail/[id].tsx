@@ -103,12 +103,26 @@ export default function VendorBookingDetailScreen() {
       </View>
 
       <BookingSummaryCard
-        title="Customer"
+        title={booking.bookingOrigin === 'guest' ? 'Guest customer' : 'Customer'}
         rows={[
           { label: 'Name',    value: booking.clientName ?? '—' },
+          ...(booking.guestEmail ? [{ label: 'Email', value: booking.guestEmail }] : []),
+          ...(booking.guestPhone ? [{ label: 'Phone', value: booking.guestPhone }] : []),
           { label: 'Vehicle', value: booking.vehicleLabel ?? '—' },
+          ...(booking.vehicleColor ? [{ label: 'Colour', value: booking.vehicleColor }] : []),
+          ...(booking.vehiclePlate ? [{ label: 'License plate', value: booking.vehiclePlate }] : []),
         ]}
       />
+
+      {booking.bookingOrigin === 'guest' ? (
+        <BookingSummaryCard
+          title="Guest request"
+          rows={[
+            { label: 'Reference', value: booking.publicReference ?? booking.id },
+            { label: 'Payment', value: 'Pay vendor directly' },
+          ]}
+        />
+      ) : null}
 
       {serviceRows.length ? (
         <BookingSummaryCard title="Services" rows={serviceRows} />

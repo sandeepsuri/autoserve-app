@@ -3,6 +3,7 @@ import { useDemoDataStore } from '@/store/useDemoDataStore';
 import { BookingMode, BookingRecord, BookingServiceSnapshot, Service, VendorSummary, Vehicle } from '@/types/domain';
 
 import { fetchProfileNamesByIds } from './profiles';
+import { extractEdgeFunctionError } from './edge-functions';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { getVehicleById } from './vehicles';
 
@@ -23,6 +24,11 @@ function toNumber(value: unknown, fallback = 0): number {
     return Number.isFinite(parsed) ? parsed : fallback;
   }
   return fallback;
+}
+
+function createDemoBookingReference(): string {
+  const suffix = Math.random().toString(36).slice(2).padEnd(8, '0').slice(0, 8).toUpperCase();
+  return `AS-${suffix}`;
 }
 
 // ─── Selectors (sync, demo-store only) ───────────────────────────────────────
@@ -63,12 +69,22 @@ function rowToRecord(item: Record<string, unknown>): BookingRecord {
 
   return {
     id: item.id as string,
-    clientId: item.client_id as string,
+    bookingOrigin: (item.booking_origin as BookingRecord['bookingOrigin'] | undefined) ?? 'client',
+    publicReference: (item.public_reference as string | undefined) ?? undefined,
+    clientId: (item.client_id as string | null | undefined) ?? undefined,
     clientName: (item.client_name as string | undefined) ?? undefined,
+    guestEmail: (item.guest_email as string | undefined) ?? undefined,
+    guestPhone: (item.guest_phone as string | undefined) ?? undefined,
     vendorId: item.vendor_id as string,
     vendorName: (item.vendor_name as string | undefined) ?? undefined,
-    vehicleId: item.vehicle_id as string,
+    vehicleId: (item.vehicle_id as string | null | undefined) ?? undefined,
     vehicleLabel: (item.vehicle_label as string | undefined) ?? undefined,
+    vehicleMake: (item.vehicle_make as string | undefined) ?? undefined,
+    vehicleModel: (item.vehicle_model as string | undefined) ?? undefined,
+    vehicleYear: (item.vehicle_year as string | undefined) ?? undefined,
+    vehicleTrim: (item.vehicle_trim as string | undefined) ?? undefined,
+    vehicleColor: (item.vehicle_color as string | undefined) ?? undefined,
+    vehiclePlate: (item.vehicle_plate as string | undefined) ?? undefined,
     serviceIds,
     services,
     bookingMode: item.booking_mode as BookingMode,
@@ -132,8 +148,9 @@ export async function listBookingsForCurrentUser(): Promise<BookingRecord[]> {
     error = response.error;
     if (!error && data) {
       const records = data.map(rowToRecord);
-      const names = await fetchProfileNamesByIds(records.map((r) => r.clientId));
-      return records.map((r) => ({ ...r, clientName: names[r.clientId] || r.clientName || 'Client' }));
+      const ids = records.map((r) => r.clientId).filter((id): id is string => Boolean(id));
+      const names = await fetchProfileNamesByIds(ids);
+      return records.map((r) => ({ ...r, clientName: (r.clientId ? names[r.clientId] : undefined) || r.clientName || 'Guest' }));
     }
   } else {
     const response = await supabase.from('bookings').select('*').eq('client_id', session.userId);
@@ -161,8 +178,9 @@ export async function listBookingsForVendorOwner(ownerId?: string): Promise<Book
   }
 
   const records = ((data ?? []) as Record<string, unknown>[]).map(rowToRecord);
-  const names = await fetchProfileNamesByIds(records.map((r) => r.clientId));
-  return records.map((r) => ({ ...r, clientName: names[r.clientId] || r.clientName || 'Client' }));
+  const ids = records.map((r) => r.clientId).filter((id): id is string => Boolean(id));
+  const names = await fetchProfileNamesByIds(ids);
+  return records.map((r) => ({ ...r, clientName: (r.clientId ? names[r.clientId] : undefined) || r.clientName || 'Guest' }));
 }
 
 export async function getBookingById(bookingId: string): Promise<BookingRecord | null> {
@@ -182,6 +200,7 @@ export async function createBooking(input: Omit<BookingRecord, 'id' | 'createdAt
   const booking: BookingRecord = {
     ...input,
     id: `booking-${Date.now()}`,
+    publicReference: input.publicReference ?? createDemoBookingReference(),
     createdAt: now,
     updatedAt: input.updatedAt ?? now,
     totalPrice: input.total,
@@ -235,6 +254,105 @@ export interface CreateBookingSelections {
   clientName?: string;
 }
 
+export interface CreateGuestBookingSelections {
+  vendor: Pick<VendorSummary, 'id' | 'name'>;
+  vehicle: {
+    make: string;
+    model: string;
+    year: string;
+    trim?: string;
+    color?: string;
+    plate?: string;
+  };
+  contact: { name: string; email: string; phone: string };
+  services: Pick<Service, 'id' | 'title' | 'category' | 'price' | 'durationMinutes'>[];
+  scheduledDate: string;
+  scheduledTime: string;
+  bookingMode: BookingMode;
+  mobileAddress?: string;
+  notes?: string;
+  idempotencyKey: string;
+}
+
+export async function createGuestBookingFromSelections(input: CreateGuestBookingSelections): Promise<BookingRecord> {
+  const snapshot: BookingServiceSnapshot[] = input.services.map((service) => ({
+    serviceId: service.id,
+    title: service.title,
+    category: service.category,
+    price: service.price,
+    durationMinutes: service.durationMinutes,
+  }));
+  const subtotal = input.services.reduce((sum, service) => sum + service.price, 0);
+  const serviceFee = Math.round(subtotal * 0.12 * 100) / 100;
+  const total = Math.round((subtotal + serviceFee) * 100) / 100;
+  const vehicleLabel = `${input.vehicle.year} ${input.vehicle.make} ${input.vehicle.model}${input.vehicle.trim ? ` ${input.vehicle.trim}` : ''}`;
+
+  if (!isSupabaseConfigured || !supabase) {
+    const now = new Date().toISOString();
+    const booking: BookingRecord = {
+      id: `guest-booking-${Date.now()}`,
+      bookingOrigin: 'guest',
+      publicReference: createDemoBookingReference(),
+      clientName: input.contact.name,
+      guestEmail: input.contact.email.toLowerCase(),
+      guestPhone: input.contact.phone.replace(/\D/g, ''),
+      vendorId: input.vendor.id,
+      vendorName: input.vendor.name,
+      vehicleLabel,
+      vehicleMake: input.vehicle.make,
+      vehicleModel: input.vehicle.model,
+      vehicleYear: input.vehicle.year,
+      vehicleTrim: input.vehicle.trim,
+      vehicleColor: input.vehicle.color,
+      vehiclePlate: input.vehicle.plate,
+      serviceIds: input.services.map((service) => service.id),
+      services: snapshot,
+      bookingMode: input.bookingMode,
+      mobileAddress: input.bookingMode === 'mobile' ? input.mobileAddress : undefined,
+      scheduledAt: toIsoTimestamp(input.scheduledDate, input.scheduledTime),
+      appointmentDate: input.scheduledDate,
+      appointmentTime: input.scheduledTime,
+      status: 'pending',
+      notes: input.notes,
+      subtotal,
+      serviceFee,
+      total,
+      totalPrice: total,
+      createdAt: now,
+      updatedAt: now,
+    };
+    useDemoDataStore.getState().addBooking(booking);
+    return booking;
+  }
+
+  const { data, error } = await supabase.functions.invoke('create-guest-booking', {
+    body: {
+      vendor_id: input.vendor.id,
+      service_ids: input.services.map((service) => service.id),
+      booking_mode: input.bookingMode,
+      appointment_date: input.scheduledDate,
+      appointment_time: input.scheduledTime,
+      mobile_address: input.bookingMode === 'mobile' ? input.mobileAddress : null,
+      notes: input.notes ?? null,
+      guest_name: input.contact.name,
+      guest_email: input.contact.email,
+      guest_phone: input.contact.phone,
+      vehicle_make: input.vehicle.make,
+      vehicle_model: input.vehicle.model,
+      vehicle_year: input.vehicle.year,
+      vehicle_trim: input.vehicle.trim ?? null,
+      vehicle_color: input.vehicle.color ?? null,
+      vehicle_plate: input.vehicle.plate ?? null,
+      idempotency_key: input.idempotencyKey,
+    },
+  });
+  if (error) throw new Error(await extractEdgeFunctionError(error, 'Could not submit the guest booking request. Please try again.'));
+  const payload = data as { booking?: Record<string, unknown>; error?: string };
+  if (payload.error) throw new Error(payload.error);
+  if (!payload.booking) throw new Error('Guest booking did not return a confirmation.');
+  return rowToRecord(payload.booking);
+}
+
 export async function createBookingFromSelections(input: CreateBookingSelections): Promise<BookingRecord> {
   const { vendor, vehicle, services, scheduledDate, scheduledTime, bookingMode, mobileAddress, notes, photos, clientId, clientName } = input;
 
@@ -268,6 +386,7 @@ export async function createBookingFromSelections(input: CreateBookingSelections
   }
 
   return createBooking({
+    bookingOrigin: 'client',
     clientId,
     clientName,
     vendorId: vendor.id,

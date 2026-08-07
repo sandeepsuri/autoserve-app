@@ -59,6 +59,28 @@ export const phoneSchema = z
     message: 'Enter a valid 10-digit phone number',
   });
 
+export const guestBookingContactSchema = z.object({
+  name: nameSchema('Full name'),
+  email: emailSchema,
+  phone: phoneSchema,
+});
+
+export const guestVehicleSchema = z.object({
+  make: requiredText('Make', { max: 60 }),
+  model: requiredText('Model', { max: 60 }),
+  year: z
+    .string()
+    .trim()
+    .regex(/^\d{4}$/, 'Enter a valid 4-digit year')
+    .refine((value) => {
+      const year = Number(value);
+      return year >= 1900 && year <= new Date().getFullYear() + 2;
+    }, 'Enter a valid vehicle year'),
+  trim: z.string().trim().max(60, 'Trim must be 60 characters or fewer').optional(),
+  color: z.string().trim().max(30, 'Colour must be 30 characters or fewer').optional(),
+  plate: z.string().trim().max(12, 'License plate must be 12 characters or fewer').optional(),
+});
+
 export function nameSchema(label: string, { min = 2, max = 60 }: { min?: number; max?: number } = {}) {
   return z
     .string()

@@ -437,6 +437,14 @@ export default function VendorBookingsScreen() {
                         <Text style={styles.clientName} numberOfLines={1}>
                           {booking.clientName ?? 'Client'}
                         </Text>
+                        {booking.bookingOrigin === 'guest' ? (
+                          <Text style={styles.guestLabel}>Guest request</Text>
+                        ) : null}
+                        {booking.publicReference ? (
+                          <Text style={styles.referenceLabel} numberOfLines={1}>
+                            Reference: {booking.publicReference}
+                          </Text>
+                        ) : null}
                         {booking.vehicleLabel ? (
                           <Text style={styles.vehicleLabel} numberOfLines={1}>
                             {booking.vehicleLabel}
@@ -1257,6 +1265,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     color: colors.textTertiary,
+  },
+  guestLabel: {
+    ...typography.caption,
+    color: colors.surfaceAccent,
+  },
+  referenceLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   statusPill: {
     borderRadius: radius.full,

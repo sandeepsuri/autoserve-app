@@ -17,6 +17,7 @@ export type BusinessType = 'shop' | 'solo';
 export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
 export type PaymentStatus = 'unpaid' | 'requires_capture' | 'captured' | 'canceled' | 'failed';
 export type BookingMode = 'shop' | 'mobile';
+export type BookingOrigin = 'client' | 'guest';
 export type ServiceCategory =
   | 'tire'
   | 'oil'
@@ -219,6 +220,13 @@ export interface BookingDraft {
   vehicleMake?: string;
   vehicleModel?: string;
   vehicleYear?: string;
+  vehicleTrim?: string;
+  vehicleColor?: string;
+  vehiclePlate?: string;
+  guestName?: string;
+  guestEmail?: string;
+  guestPhone?: string;
+  guestContactConsent?: boolean;
   bookingMode?: BookingMode;
   paymentMethod?: 'online' | 'shop';
   scheduledDate?: string;
@@ -230,12 +238,22 @@ export interface BookingDraft {
 
 export interface BookingRecord {
   id: string;
-  clientId: string;
+  bookingOrigin?: BookingOrigin;
+  publicReference?: string;
+  clientId?: string;
   clientName?: string;
+  guestEmail?: string;
+  guestPhone?: string;
   vendorId: string;
   vendorName?: string;
-  vehicleId: string;
+  vehicleId?: string;
   vehicleLabel?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleYear?: string;
+  vehicleTrim?: string;
+  vehicleColor?: string;
+  vehiclePlate?: string;
   serviceIds: string[];
   services: BookingServiceSnapshot[];
   bookingMode: BookingMode;

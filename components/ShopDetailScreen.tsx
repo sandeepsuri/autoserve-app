@@ -27,7 +27,7 @@ interface Props {
 export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props) {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { clearDraft, updateDraft } = useBookingDraftStore();
+  const { clearDraft, setSubmittedGuestBooking, updateDraft } = useBookingDraftStore();
   const { session, setGuestMode } = useAuthStore();
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -76,15 +76,18 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
   }
 
   const handleBook = () => {
-    if (!session) {
-      setGuestMode(true);
-    }
     clearDraft();
+    setSubmittedGuestBooking(null);
     // Seed a default booking mode at entry so the draft always carries a valid
     // mode, even if the service step's effect hasn't run yet (the user can still
     // change it there).
     updateDraft({ vendorId: vendor.id, bookingMode: 'shop' });
-    router.push('/(client)/booking/vehicle');
+    if (session) {
+      router.push('/(client)/booking/vehicle');
+      return;
+    }
+    setGuestMode(true);
+    router.push(`/(public)/guest-booking/${vendor.id}/details`);
   };
 
   return (

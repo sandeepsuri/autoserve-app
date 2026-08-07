@@ -50,6 +50,7 @@ jest.mock('@/store/useDemoDataStore', () => ({
 import { BookingRecord, Service, VendorSummary, Vehicle } from '@/types/domain';
 import {
   createBookingFromSelections,
+  createGuestBookingFromSelections,
   getBookingByIdFromStore,
   getBookingsForClient,
   getBookingsForVendor,
@@ -147,6 +148,11 @@ describe('createBookingFromSelections', () => {
     expect(booking.status).toBe('pending');
   });
 
+  it('assigns a public reference in demo mode', async () => {
+    const booking = await createBookingFromSelections(baseSelections);
+    expect(booking.publicReference).toMatch(/^AS-[A-Z0-9]{8}$/);
+  });
+
   it('populates serviceIds from selected services', async () => {
     const services = [makeService({ id: 'svc-a' }), makeService({ id: 'svc-b' })];
     const booking = await createBookingFromSelections({ ...baseSelections, services });
@@ -194,6 +200,47 @@ describe('createBookingFromSelections', () => {
   it('passes notes through to the booking record', async () => {
     const booking = await createBookingFromSelections({ ...baseSelections, notes: 'Grinding noise on turns' });
     expect(booking.notes).toBe('Grinding noise on turns');
+  });
+});
+
+describe('createGuestBookingFromSelections', () => {
+  const guestSelections = {
+    vendor: makeVendor(),
+    contact: { name: 'Jordan Lee', email: 'JORDAN@example.com', phone: '(416) 555-0182' },
+    vehicle: { make: 'Honda', model: 'Civic', year: '2021', color: 'Blue', plate: 'abc 123' },
+    services: [makeService()],
+    scheduledDate: '2026-06-01',
+    scheduledTime: '10:00',
+    bookingMode: 'shop' as const,
+    idempotencyKey: '79f04d1e-6c22-4c9a-bc23-8ea794e372af',
+  };
+
+  it('creates a pending guest request without client or saved vehicle ids', async () => {
+    const booking = await createGuestBookingFromSelections(guestSelections);
+    expect(booking).toMatchObject({
+      bookingOrigin: 'guest',
+      status: 'pending',
+      vehicleLabel: '2021 Honda Civic',
+      clientName: 'Jordan Lee',
+    });
+    expect(booking.clientId).toBeUndefined();
+    expect(booking.vehicleId).toBeUndefined();
+  });
+
+  it('normalizes guest contact snapshots and preserves vehicle details', async () => {
+    const booking = await createGuestBookingFromSelections(guestSelections);
+    expect(booking.guestEmail).toBe('jordan@example.com');
+    expect(booking.guestPhone).toBe('4165550182');
+    expect(booking.vehicleColor).toBe('Blue');
+    expect(booking.vehiclePlate).toBe('abc 123');
+  });
+
+  it('uses server-equivalent pricing and pay-later state in demo mode', async () => {
+    const booking = await createGuestBookingFromSelections(guestSelections);
+    expect(booking.subtotal).toBe(80);
+    expect(booking.serviceFee).toBe(9.6);
+    expect(booking.total).toBe(89.6);
+    expect(booking.paymentStatus).toBeUndefined();
   });
 });
 
