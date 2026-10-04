@@ -2,12 +2,12 @@ import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 
 import { useAuthStore } from '@/store/useAuthStore';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
-import { colors, radius, spacing, typography } from '@/constants/theme';
+import { colors, spacing, typography } from '@/constants/theme';
 import { signOut } from '@/lib/auth';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 

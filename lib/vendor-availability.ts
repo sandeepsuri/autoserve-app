@@ -16,7 +16,6 @@ import {
   DayRule,
   makeDefaultAvailability,
   makeEmptyAvailability,
-  ServiceModeRules,
   SlotLengthMinutes,
   timeToMinutes,
   VendorAvailability,
@@ -483,92 +482,4 @@ export async function saveVendorAvailability(
   };
 
   return { availability: saved, conflicts };
-}
-
-// ── Granular helpers (for modal actions) ─────────────────────────────────────
-
-/**
- * Update one or more weekly day rules without touching blocked periods.
- */
-export async function updateWeeklyRule(
-  day: DayOfWeek,
-  rule: Partial<DayRule>,
-  vendorId?: string,
-): Promise<void> {
-  const current = await loadVendorAvailability(vendorId);
-  const next: VendorAvailability = {
-    ...current,
-    weeklyRules: {
-      ...current.weeklyRules,
-      [day]: { ...current.weeklyRules[day], ...rule },
-    },
-  };
-  await saveVendorAvailability(next, vendorId);
-}
-
-/**
- * Update slot length.
- */
-export async function updateSlotLength(
-  slotLengthMinutes: SlotLengthMinutes,
-  vendorId?: string,
-): Promise<void> {
-  const current = await loadVendorAvailability(vendorId);
-  await saveVendorAvailability({ ...current, slotLengthMinutes }, vendorId);
-}
-
-/**
- * Update capacity per slot.
- */
-export async function updateCapacity(
-  capacityPerSlot: number,
-  vendorId?: string,
-): Promise<void> {
-  const current = await loadVendorAvailability(vendorId);
-  await saveVendorAvailability({ ...current, capacityPerSlot }, vendorId);
-}
-
-/**
- * Update service-mode rules.
- */
-export async function updateServiceModeRules(
-  patch: Partial<ServiceModeRules>,
-  vendorId?: string,
-): Promise<void> {
-  const current = await loadVendorAvailability(vendorId);
-  await saveVendorAvailability(
-    { ...current, serviceModeRules: { ...current.serviceModeRules, ...patch } },
-    vendorId,
-  );
-}
-
-/**
- * Add a blocked period.
- */
-export async function addBlockedPeriod(
-  period: BlockedPeriod,
-  vendorId?: string,
-): Promise<{ conflicts: AvailabilityConflict[] }> {
-  const current = await loadVendorAvailability(vendorId);
-  const next: VendorAvailability = {
-    ...current,
-    blockedPeriods: [...current.blockedPeriods, period],
-  };
-  const { conflicts } = await saveVendorAvailability(next, vendorId);
-  return { conflicts };
-}
-
-/**
- * Remove a blocked period by id.
- */
-export async function removeBlockedPeriod(
-  id: string,
-  vendorId?: string,
-): Promise<void> {
-  const current = await loadVendorAvailability(vendorId);
-  const next: VendorAvailability = {
-    ...current,
-    blockedPeriods: current.blockedPeriods.filter((b) => b.id !== id),
-  };
-  await saveVendorAvailability(next, vendorId);
 }

@@ -1,12 +1,12 @@
 import { ReactNode, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Href, useRouter } from 'expo-router';
 
 import { AppButton } from '@/components/AppButton';
 import { AppHeader } from '@/components/AppHeader';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
-import { colors, spacing, typography } from '@/constants/theme';
+import { colors, spacing } from '@/constants/theme';
 import { isVendorApplicationLocked } from '@/lib/vendor-onboarding';
 import { getNextStep, getPrevStep, VendorOnboardingStepId } from '@/lib/vendor-onboarding-steps';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';

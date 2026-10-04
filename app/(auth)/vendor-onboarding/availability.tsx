@@ -20,7 +20,6 @@ import { colors, radius, spacing, typography } from '@/constants/theme';
 import { getPrevStep, getNextStep } from '@/lib/vendor-onboarding-steps';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 import {
-  DAY_LABELS,
   DAY_FULL_LABELS,
   DayOfWeek,
   DayRule,

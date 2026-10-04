@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AutoServe Guest Booking Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--ink:#0f172a;--muted:#475569;--faint:#94a3b8;--line:#e2e8f0;--bg:#f8fafc;--card:#fff;--brand:#0f4c81;--accent:#ff7a1a;--soft:#fff7ed;--ok:#10b981;--danger:#b91c1c;--shadow:0 18px 55px rgba(15,23,42,.09)}
+    *{box-sizing:border-box} body{margin:0;background:linear-gradient(145deg,#eef6fc 0,#f8fafc 34%,#fff8f2 100%);color:var(--ink);font-family:"Plus Jakarta Sans",sans-serif}
+    button,input,select,textarea{font:inherit}.shell{min-height:100vh;padding:28px 18px 56px}.phone{width:min(100%,560px);margin:auto;background:var(--bg);border:1px solid rgba(203,213,225,.8);border-radius:34px;box-shadow:var(--shadow);overflow:hidden;min-height:760px}.topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 22px;background:#fff;border-bottom:1px solid var(--line)}
+    .brand{font-weight:700;color:var(--brand);letter-spacing:-.03em;font-size:20px}.secure{font-size:12px;color:var(--muted)}.screen{display:none}.screen.active{display:block}.content{padding:24px 22px 30px}.back{border:0;background:transparent;color:var(--brand);font-weight:700;padding:0;margin-bottom:18px;cursor:pointer}.eyebrow{text-transform:uppercase;color:var(--accent);font-size:12px;letter-spacing:.1em;font-weight:700}.title{font-size:28px;line-height:1.18;letter-spacing:-.035em;margin:7px 0}.sub{color:var(--muted);font-size:14px;line-height:1.55;margin:0}.progress{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:22px 0}.progress span{height:5px;background:var(--line);border-radius:99px}.progress span.on{background:var(--accent)}
+    .vendor{display:flex;gap:14px;align-items:center;padding:15px;background:#eef6fc;border:1px solid #cfe3f3;border-radius:18px;margin:18px 0 22px}.vendor-icon{width:48px;height:48px;border-radius:14px;background:var(--brand);color:white;display:grid;place-items:center;font-size:23px}.vendor strong,.vendor small{display:block}.vendor small{color:var(--muted);margin-top:3px}.section{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin:14px 0}.section h2{font-size:17px;margin:0 0 4px}.section-note{font-size:12px;color:var(--muted);margin:0 0 16px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{font-size:13px;font-weight:700}.req{color:var(--accent)}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);padding:13px 14px;outline:0}input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(15,76,129,.1)}textarea{min-height:88px;resize:vertical}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.choice{border:1px solid var(--line);border-radius:14px;background:white;padding:13px;text-align:left;cursor:pointer}.choice.active{border-color:var(--brand);background:#f3f8fc;box-shadow:inset 0 0 0 1px var(--brand)}.choice strong,.choice small{display:block}.choice small{color:var(--muted);margin-top:4px;line-height:1.4}.services{display:grid;gap:9px}.service{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:14px;padding:13px;cursor:pointer}.service.active{border-color:var(--accent);background:var(--soft)}.service small{color:var(--muted);display:block;margin-top:3px}.price{font-weight:700;color:var(--brand)}
+    .footer{position:sticky;bottom:0;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:15px 22px 20px}.total{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:10px}.total strong{color:var(--ink);font-size:17px}.primary,.secondary{width:100%;border:0;border-radius:14px;padding:15px;font-weight:700;cursor:pointer}.primary{background:var(--accent);color:#fff}.primary:hover{background:#e96a0d}.secondary{background:#fff;border:1px solid var(--line);color:var(--brand);margin-top:9px}.error{display:none;color:var(--danger);background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:11px;font-size:13px;margin-top:12px}.error.show{display:block}
+    .summary{background:#fff;border:1px solid var(--line);border-radius:18px;padding:17px;margin:12px 0}.summary-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.summary h2{font-size:16px;margin:0}.edit{border:0;background:transparent;color:var(--brand);font-weight:700;cursor:pointer}.row{display:flex;justify-content:space-between;gap:22px;padding:9px 0;border-top:1px solid #f1f5f9;font-size:13px}.row span:first-child{color:var(--muted)}.row span:last-child{text-align:right;font-weight:600}.notice{display:flex;gap:10px;background:var(--soft);border:1px solid #fed7aa;border-radius:16px;padding:14px;margin:16px 0;font-size:13px;line-height:1.5}.consent{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.5;margin:18px 2px}.consent input{width:18px;height:18px;margin-top:2px}.success{text-align:center;padding:46px 24px}.success-mark{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;margin:0 auto 22px;background:#ecfdf5;border:1px solid #bbf7d0;color:var(--ok);font-size:42px}.reference{background:#0b1220;color:white;border-radius:18px;padding:19px;margin:24px 0}.reference small{display:block;color:#cbd5e1}.reference strong{display:block;font-size:24px;letter-spacing:.08em;margin-top:6px}.pending{display:inline-block;color:#c2410c;background:var(--soft);border-radius:99px;padding:6px 10px;font-size:12px;font-weight:700;margin-bottom:12px}
+    @media(max-width:600px){.shell{padding:0}.phone{border-radius:0;border:0;min-height:100vh}.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.content{padding-inline:18px}.footer{padding-inline:18px}}
+  </style>
+</head>
+<body>
+<main class="shell"><div class="phone">
+  <header class="topbar"><span class="brand">AutoServe</span><span class="secure">Guest booking · no account needed</span></header>
+
+  <section class="screen active" id="details">
+    <div class="content">
+      <button class="back" type="button">← Riverside Auto</button>
+      <div class="eyebrow">Guest booking · Step 1 of 2</div><h1 class="title">Tell us about your appointment</h1><p class="sub">Nothing is saved to a garage or profile. These details are shared only with the selected vendor for this request.</p>
+      <div class="progress"><span class="on"></span><span></span></div>
+      <div class="vendor"><div class="vendor-icon">🔧</div><div><strong>Riverside Auto Care</strong><small>124 King Street West · Toronto</small></div></div>
+
+      <div class="section"><h2>Your contact details</h2><p class="section-note">The vendor will use these details to confirm or discuss the request.</p><div class="grid">
+        <div class="field full"><label>Full name <span class="req">*</span></label><input id="name" value="Jordan Lee" autocomplete="name"></div>
+        <div class="field"><label>Email <span class="req">*</span></label><input id="email" value="jordan@example.com" type="email" autocomplete="email"></div>
+        <div class="field"><label>Phone <span class="req">*</span></label><input id="phone" value="416 555 0182" type="tel" autocomplete="tel"></div>
+      </div></div>
+
+      <div class="section"><h2>Vehicle details</h2><p class="section-note">Used for this request only—this vehicle will not be saved.</p><div class="grid">
+        <div class="field"><label>Make <span class="req">*</span></label><input id="make" value="Honda"></div><div class="field"><label>Model <span class="req">*</span></label><input id="model" value="Civic"></div>
+        <div class="field"><label>Year <span class="req">*</span></label><input id="year" value="2021" inputmode="numeric"></div><div class="field"><label>Trim</label><input id="trim" placeholder="Optional"></div>
+        <div class="field"><label>Colour</label><input id="color" value="Blue"></div><div class="field"><label>License plate</label><input id="plate" placeholder="Optional"></div>
+      </div></div>
+
+      <div class="section"><h2>Service and visit type</h2><p class="section-note">Choose one or more services.</p><div class="services">
+        <div class="service active" data-price="89"><div><strong>Oil change</strong><small>45 min · Synthetic oil</small></div><span class="price">$89</span></div>
+        <div class="service" data-price="65"><div><strong>Brake inspection</strong><small>30 min · Visual and road test</small></div><span class="price">$65</span></div>
+        <div class="service" data-price="129"><div><strong>Engine diagnostics</strong><small>60 min · Scan and assessment</small></div><span class="price">$129</span></div>
+      </div><div class="choice-grid" style="margin-top:14px"><button class="choice active" data-mode="shop"><strong>Shop visit</strong><small>Bring your vehicle to Riverside Auto.</small></button><button class="choice" data-mode="mobile"><strong>Mobile service</strong><small>The mechanic comes to you.</small></button></div>
+        <div class="field full" id="addressField" style="display:none;margin-top:13px"><label>Service address <span class="req">*</span></label><input id="address" placeholder="Street address, city, postal code"></div>
+      </div>
+
+      <div class="section"><h2>Date and time</h2><p class="section-note">Only currently available times are shown.</p><div class="grid"><div class="field"><label>Date <span class="req">*</span></label><select id="date"><option>Friday, August 14</option><option>Saturday, August 15</option></select></div><div class="field"><label>Time <span class="req">*</span></label><select id="time"><option>10:00 AM</option><option>11:30 AM</option><option>2:00 PM</option></select></div><div class="field full"><label>Describe the problem</label><textarea id="notes" placeholder="Optional details for the mechanic">Squealing sound when braking at low speed.</textarea></div></div></div>
+      <div class="error" id="detailsError">Complete all required contact and vehicle fields before continuing.</div>
+    </div>
+    <div class="footer"><div class="total"><span>Estimated total · Pay vendor later</span><strong id="total">$99.68</strong></div><button class="primary" id="toReview">Review request</button></div>
+  </section>
+
+  <section class="screen" id="review">
+    <div class="content"><button class="back" id="reviewBack">← Edit booking details</button><div class="eyebrow">Guest booking · Step 2 of 2</div><h1 class="title">Review your request</h1><p class="sub">Check everything below. The appointment is pending until Riverside Auto accepts it.</p><div class="progress"><span class="on"></span><span class="on"></span></div>
+      <div class="summary"><div class="summary-head"><h2>Contact</h2><button class="edit" data-edit>Edit</button></div><div class="row"><span>Name</span><span id="rName"></span></div><div class="row"><span>Email</span><span id="rEmail"></span></div><div class="row"><span>Phone</span><span id="rPhone"></span></div></div>
+      <div class="summary"><div class="summary-head"><h2>Vehicle</h2><button class="edit" data-edit>Edit</button></div><div class="row"><span>Vehicle</span><span id="rVehicle"></span></div><div class="row"><span>Colour / plate</span><span id="rVehicleExtra"></span></div></div>
+      <div class="summary"><div class="summary-head"><h2>Appointment</h2><button class="edit" data-edit>Edit</button></div><div class="row"><span>Vendor</span><span>Riverside Auto Care</span></div><div class="row"><span>Services</span><span id="rServices"></span></div><div class="row"><span>Date & time</span><span id="rDate"></span></div><div class="row"><span>Visit type</span><span id="rMode"></span></div><div class="row"><span>Estimate</span><span id="rTotal"></span></div></div>
+      <div class="notice"><span>ℹ️</span><span><strong>No payment is due now.</strong><br>Pay the vendor directly after they accept and complete the service.</span></div>
+      <label class="consent"><input type="checkbox" id="consent"><span>I agree that Riverside Auto may use these contact details to respond to this booking request.</span></label><div class="error" id="consentError">Please confirm contact permission before submitting.</div>
+    </div><div class="footer"><button class="primary" id="submit">Send booking request</button><button class="secondary" id="editBottom">Go back and edit</button></div>
+  </section>
+
+  <section class="screen" id="success"><div class="success"><div class="success-mark">✓</div><span class="pending">Pending vendor review</span><h1 class="title">Your request has been sent</h1><p class="sub">Riverside Auto will review the appointment. We’ll email <strong id="successEmail"></strong> when it is accepted or declined.</p><div class="reference"><small>Your booking reference</small><strong>AS-7K4P2M</strong></div><div class="summary" style="text-align:left"><div class="row"><span>Appointment</span><span id="sDate"></span></div><div class="row"><span>Vehicle</span><span id="sVehicle"></span></div><div class="row"><span>Payment</span><span>Pay vendor directly</span></div></div><button class="primary" id="again">Back to discovery</button><button class="secondary" id="vendorBack">Return to vendor</button></div></section>
+</div></main>
+<script>
+  const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+  let mode='shop';
+  const show=id=>{$$('.screen').forEach(x=>x.classList.remove('active'));$('#'+id).classList.add('active');scrollTo(0,0)};
+  $$('.service').forEach(x=>x.onclick=()=>{x.classList.toggle('active');reprice()});
+  $$('.choice').forEach(x=>x.onclick=()=>{$$('.choice').forEach(y=>y.classList.remove('active'));x.classList.add('active');mode=x.dataset.mode;$('#addressField').style.display=mode==='mobile'?'flex':'none'});
+  function reprice(){const subtotal=$$('.service.active').reduce((n,x)=>n+Number(x.dataset.price),0);$('#total').textContent='$'+(subtotal*1.12).toFixed(2)}
+  function fillReview(){const services=$$('.service.active').map(x=>x.querySelector('strong').textContent).join(', ');$('#rName').textContent=$('#name').value;$('#rEmail').textContent=$('#email').value;$('#rPhone').textContent=$('#phone').value;$('#rVehicle').textContent=`${$('#year').value} ${$('#make').value} ${$('#model').value}${$('#trim').value?' '+$('#trim').value:''}`;$('#rVehicleExtra').textContent=[$('#color').value,$('#plate').value].filter(Boolean).join(' · ')||'—';$('#rServices').textContent=services;$('#rDate').textContent=$('#date').value+' · '+$('#time').value;$('#rMode').textContent=mode==='shop'?'Shop visit':'Mobile service';$('#rTotal').textContent=$('#total').textContent;}
+  $('#toReview').onclick=()=>{const fields=['name','email','phone','make','model','year'];const invalid=fields.some(x=>!$('#'+x).value.trim())||!$$('.service.active').length||(mode==='mobile'&&!$('#address').value.trim());$('#detailsError').classList.toggle('show',invalid);if(!invalid){fillReview();show('review')}};
+  const edit=()=>show('details');$('#reviewBack').onclick=edit;$('#editBottom').onclick=edit;$$('[data-edit]').forEach(x=>x.onclick=edit);
+  $('#submit').onclick=()=>{if(!$('#consent').checked){$('#consentError').classList.add('show');return}$('#successEmail').textContent=$('#email').value;$('#sDate').textContent=$('#rDate').textContent;$('#sVehicle').textContent=$('#rVehicle').textContent;show('success')};
+  $('#consent').onchange=()=>$('#consentError').classList.remove('show');$('#again').onclick=()=>show('details');$('#vendorBack').onclick=()=>show('details');reprice();
+</script>
+</body></html>

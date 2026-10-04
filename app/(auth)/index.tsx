@@ -193,10 +193,6 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
   },
-  subtitle: {
-    ...typography.bodyMd,
-    color: colors.textSecondary,
-  },
   toggleRow: {
     flexDirection: 'row',
     gap: spacing.md,

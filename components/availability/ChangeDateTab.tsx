@@ -168,7 +168,7 @@ export function ChangeDateTab() {
           <LegendItem color={colors.surfaceBrand} label="Selected" />
           <LegendItem color={colors.bgElevated} border label="Available" />
           <LegendItem color={colors.surfaceSubtleOrange} label="Limited" />
-          <LegendItem color={colors.bgBase} striped label="Closed" />
+          <LegendItem color={colors.bgBase} label="Closed" />
         </View>
       </AppCard>
 
@@ -214,12 +214,10 @@ function LegendItem({
   color,
   label,
   border,
-  striped,
 }: {
   color: string;
   label: string;
   border?: boolean;
-  striped?: boolean;
 }) {
   return (
     <View style={styles.legendItem}>

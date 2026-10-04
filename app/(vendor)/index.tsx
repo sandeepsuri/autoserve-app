@@ -107,6 +107,11 @@ export default function VendorDashboardScreen() {
                     <Text style={styles.customerName} numberOfLines={1}>
                       {booking.clientName ?? 'Client'}
                     </Text>
+                    {booking.publicReference ? (
+                      <Text style={styles.upNextReference} numberOfLines={1}>
+                        Reference: {booking.publicReference}
+                      </Text>
+                    ) : null}
                     <Text style={styles.appointmentMeta} numberOfLines={2}>
                       {serviceSummary(booking)}
                     </Text>
@@ -147,6 +152,9 @@ export default function VendorDashboardScreen() {
         bookings.slice(0, 3).map((booking) => (
           <AppCard key={booking.id}>
             <Text style={typography.titleSm}>{booking.clientName || 'Client'}</Text>
+            {booking.publicReference ? (
+              <Text style={styles.reference}>Reference: {booking.publicReference}</Text>
+            ) : null}
             <Text style={styles.subtitle}>{`${booking.vehicleLabel} - ${booking.services.map((s) => s.title).join(' · ')}`}</Text>
             <Text style={styles.subtitle}>{formatScheduledEST(booking.scheduledAt)}</Text>
             <Text style={styles.notes}>{booking.notes}</Text>
@@ -168,6 +176,10 @@ const styles = StyleSheet.create({
   notes: {
     ...typography.bodyMd,
     color: colors.info,
+  },
+  reference: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   row: {
     flexDirection: 'row',
@@ -217,6 +229,10 @@ const styles = StyleSheet.create({
   },
   upNextList: {
     gap: spacing.md,
+  },
+  upNextReference: {
+    ...typography.caption,
+    color: '#CBD5E1',
   },
   upNextRow: {
     flexDirection: 'row',

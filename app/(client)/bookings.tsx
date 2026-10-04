@@ -82,6 +82,12 @@ export default function ClientBookingsScreen() {
                   </View>
                 </View>
 
+                {booking.publicReference ? (
+                  <Text style={styles.reference} numberOfLines={1}>
+                    Reference: {booking.publicReference}
+                  </Text>
+                ) : null}
+
                 <Text style={styles.services} numberOfLines={1}>
                   {booking.services.length
                     ? booking.services.map((s) => s.title).join(' · ')
@@ -145,6 +151,10 @@ const styles = StyleSheet.create({
   },
   services: {
     ...typography.bodyMd,
+    color: colors.textSecondary,
+  },
+  reference: {
+    ...typography.caption,
     color: colors.textSecondary,
   },
   metaRow: {
