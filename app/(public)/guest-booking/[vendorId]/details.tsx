@@ -10,10 +10,12 @@ import { AppTextField } from '@/components/AppTextField';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { SearchablePicker } from '@/components/SearchablePicker';
+import { ServiceRemovalNotice } from '@/components/ServiceRemovalNotice';
 import { colors, radius, spacing, typography } from '@/constants/theme';
-import { BOOKING_TYPE_LABELS, isBookableMode } from '@/lib/booking-types';
+import { BOOKING_TYPE_LABELS, ineligibleReason, isBookableMode } from '@/lib/booking-types';
 import { useBookingBack } from '@/lib/booking-navigation';
 import { addDays, startOfDay, toDateKey } from '@/lib/format';
+import { useBookingServiceReconciliation } from '@/lib/use-booking-service-reconciliation';
 import { guestBookingContactSchema, guestVehicleSchema, sanitizeText } from '@/lib/validation';
 import { listVehicleMakes, listVehicleModels, listVehicleYears } from '@/lib/vehicle-catalog';
 import { getVendorDetail } from '@/lib/vendors';
@@ -73,6 +75,7 @@ export default function GuestBookingDetailsScreen() {
       updateDraft({ bookingMode: undefined, scheduledDate: undefined, scheduledTime: undefined, mobileAddress: undefined });
     }
   }, [data, draft.bookingMode, updateDraft]);
+  const removalNotice = useBookingServiceReconciliation(data?.services);
   const dateOptions = useMemo(() => {
     if (!data?.availability || !mode) return [];
     return Array.from({ length: DATE_WINDOW }, (_, index) => toDateKey(addDays(startOfDay(new Date()), index + 1)))
@@ -155,8 +158,10 @@ export default function GuestBookingDetailsScreen() {
         <Text style={typography.titleSm}>Services and booking type</Text>
         {services.map((service) => {
           const active = selectedServiceIds.includes(service.id);
-          return <Pressable key={service.id} onPress={() => toggleService(service.id)} style={[styles.option, active && styles.optionActive]}><View style={styles.flex}><Text style={typography.labelLg}>{service.title}</Text><Text style={styles.secondary}>{service.durationMinutes} min</Text></View><Text style={styles.price}>${service.price.toFixed(2)}</Text></Pressable>;
+          const disabledReason = ineligibleReason(service, mode);
+          return <Pressable key={service.id} disabled={Boolean(disabledReason)} accessibilityRole="button" accessibilityState={{ selected: active, disabled: Boolean(disabledReason) }} onPress={() => toggleService(service.id)} style={[styles.option, active && styles.optionActive, disabledReason ? styles.optionDisabled : null]}><View style={styles.flex}><Text style={typography.labelLg}>{service.title}</Text><Text style={styles.secondary}>{service.durationMinutes} min</Text>{disabledReason ? <Text style={styles.disabledReason}>{disabledReason}</Text> : null}</View><Text style={styles.price}>${service.price.toFixed(2)}</Text></Pressable>;
         })}
+        <ServiceRemovalNotice message={removalNotice} />
         {errors.services ? <Text style={styles.error}>{errors.services}</Text> : null}
         <View style={styles.twoColumn}>
           {modes.map((option) => <ModeOption key={option} label={BOOKING_TYPE_LABELS[option]} active={mode === option} onPress={() => updateDraft({ bookingMode: option, scheduledDate: undefined, scheduledTime: undefined, mobileAddress: undefined })} />)}
@@ -188,7 +193,7 @@ function ModeOption({ label, active, onPress }: { label: string; active: boolean
 const styles = StyleSheet.create({
   progress: { flexDirection: 'row', gap: spacing.sm }, progressActive: { flex: 1, height: 5, borderRadius: radius.full, backgroundColor: colors.surfaceAccent }, progressIdle: { flex: 1, height: 5, borderRadius: radius.full, backgroundColor: colors.borderDefault },
   vendorCard: { backgroundColor: '#EEF6FC', gap: spacing.xs }, section: { gap: spacing.md }, secondary: { ...typography.bodyMd, color: colors.textSecondary },
-  twoColumn: { flexDirection: 'row', gap: spacing.md }, flex: { flex: 1 }, option: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: colors.borderDefault, borderRadius: radius.sm, padding: spacing.lg }, optionActive: { borderColor: colors.surfaceBrand, backgroundColor: '#F3F8FC' }, price: { ...typography.labelLg, color: colors.surfaceBrand },
+  twoColumn: { flexDirection: 'row', gap: spacing.md }, flex: { flex: 1 }, option: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: colors.borderDefault, borderRadius: radius.sm, padding: spacing.lg }, optionActive: { borderColor: colors.surfaceBrand, backgroundColor: '#F3F8FC' }, optionDisabled: { backgroundColor: colors.bgBase }, disabledReason: { ...typography.caption, color: colors.pending }, price: { ...typography.labelLg, color: colors.surfaceBrand },
   mode: { flex: 1, minHeight: 58, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.borderDefault, borderRadius: radius.sm, padding: spacing.md }, radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: colors.borderStrong }, radioActive: { borderColor: colors.surfaceBrand, backgroundColor: colors.surfaceBrand },
   fieldLabel: { ...typography.labelMd }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, chip: { borderWidth: 1, borderColor: colors.borderDefault, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.bgElevated }, chipActive: { backgroundColor: colors.surfaceBrand, borderColor: colors.surfaceBrand }, chipText: { ...typography.caption, color: colors.textSecondary }, chipTextActive: { color: colors.textInverse }, error: { ...typography.caption, color: colors.danger }, totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
 });

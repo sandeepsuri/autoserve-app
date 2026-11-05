@@ -2,6 +2,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
 import { BookingMode, BookingRecord, BookingServiceSnapshot, Service, VendorSummary, Vehicle } from '@/types/domain';
 
+import { assertServicesEligible } from './booking-types';
 import { fetchProfileNamesByIds } from './profiles';
 import { extractEdgeFunctionError } from './edge-functions';
 import { isSupabaseConfigured, supabase } from './supabase';
@@ -243,7 +244,7 @@ export async function createBooking(input: Omit<BookingRecord, 'id' | 'createdAt
 export interface CreateBookingSelections {
   vendor: Pick<VendorSummary, 'id' | 'name'>;
   vehicle: Pick<Vehicle, 'id'> & Partial<Pick<Vehicle, 'make' | 'model' | 'year' | 'nickname'>>;
-  services: Pick<Service, 'id' | 'title' | 'category' | 'price' | 'durationMinutes'>[];
+  services: Pick<Service, 'id' | 'title' | 'category' | 'price' | 'durationMinutes' | 'bookingEligibility'>[];
   scheduledDate: string;
   scheduledTime: string;
   bookingMode: BookingMode;
@@ -265,7 +266,7 @@ export interface CreateGuestBookingSelections {
     plate?: string;
   };
   contact: { name: string; email: string; phone: string };
-  services: Pick<Service, 'id' | 'title' | 'category' | 'price' | 'durationMinutes'>[];
+  services: Pick<Service, 'id' | 'title' | 'category' | 'price' | 'durationMinutes' | 'bookingEligibility'>[];
   scheduledDate: string;
   scheduledTime: string;
   bookingMode: BookingMode;
@@ -275,6 +276,7 @@ export interface CreateGuestBookingSelections {
 }
 
 export async function createGuestBookingFromSelections(input: CreateGuestBookingSelections): Promise<BookingRecord> {
+  assertServicesEligible(input.services, input.bookingMode);
   const snapshot: BookingServiceSnapshot[] = input.services.map((service) => ({
     serviceId: service.id,
     title: service.title,
@@ -355,6 +357,7 @@ export async function createGuestBookingFromSelections(input: CreateGuestBooking
 
 export async function createBookingFromSelections(input: CreateBookingSelections): Promise<BookingRecord> {
   const { vendor, vehicle, services, scheduledDate, scheduledTime, bookingMode, mobileAddress, notes, photos, clientId, clientName } = input;
+  assertServicesEligible(services, bookingMode);
 
   if (!vehicle.id) {
     throw new Error('A vehicle is required to book a service.');

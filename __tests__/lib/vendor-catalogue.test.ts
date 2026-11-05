@@ -61,7 +61,7 @@ function mockBuilder(table: string) {
 
 const service = (n: number): Service => ({
   id: `11111111-1111-4111-8111-11111111111${n}`, vendorId: 'vendor-1',
-  title: `Service ${n}`, category: 'oil', price: 40, durationMinutes: 30, active: true,
+  title: `Service ${n}`, category: 'oil', price: 40, durationMinutes: 30, active: true, bookingEligibility: 'both',
   description: 'Keep these details', image: 'service.jpg',
 });
 
@@ -122,4 +122,24 @@ test('inactive shops and signed-out sessions do not provide an identity', async 
 test('an owner change during a request discards the old identity', async () => {
   mockFinishVendorRead = () => { mockOwner = 'owner-2'; };
   expect(await getVendorForOwner()).toBeNull();
+});
+
+test('eligibility survives a vendor edit, a pause, and a fresh read', async () => {
+  const [first] = await listVendorServices();
+  expect(first.bookingEligibility).toBe('both');
+  await upsertVendorService({ ...first, bookingEligibility: 'shop' });
+  expect(mockWrites).toHaveBeenLastCalledWith(expect.objectContaining({ booking_eligibility: 'shop' }));
+
+  // Pausing saves the mapped read, so the field must round-trip through it.
+  const edited = (await listVendorServices()).find((row) => row.id === first.id)!;
+  expect(edited.bookingEligibility).toBe('shop');
+  await upsertVendorService({ ...edited, active: false });
+  expect(mockWrites).toHaveBeenLastCalledWith(expect.objectContaining({ active: false, booking_eligibility: 'shop' }));
+  expect((await listVendorServices()).find((row) => row.id === first.id)?.bookingEligibility).toBe('shop');
+});
+
+test('a new service persists its eligibility and returns it', async () => {
+  const saved = await upsertVendorService({ ...service(9), id: 'service-new', bookingEligibility: 'mobile' });
+  expect(mockWrites).toHaveBeenLastCalledWith(expect.objectContaining({ booking_eligibility: 'mobile' }));
+  expect(saved.bookingEligibility).toBe('mobile');
 });

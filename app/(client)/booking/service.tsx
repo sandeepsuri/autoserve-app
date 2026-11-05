@@ -10,10 +10,12 @@ import { AppTextField } from '@/components/AppTextField';
 import { BookingSummaryCard } from '@/components/BookingSummaryCard';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
+import { ServiceRemovalNotice } from '@/components/ServiceRemovalNotice';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import { isBookableMode } from '@/lib/booking-types';
 import { useBookingBack } from '@/lib/booking-navigation';
+import { useBookingServiceReconciliation } from '@/lib/use-booking-service-reconciliation';
 import { clampLength } from '@/lib/validation';
 import { listVehicles } from '@/lib/vehicles';
 import { getVendorDetail } from '@/lib/vendors';
@@ -65,6 +67,7 @@ export default function BookingDetailsScreen() {
     const next = isBookableMode(data.vendor?.bookingModes ?? [], draft.bookingMode) ? draft.bookingMode : undefined;
     if (next !== draft.bookingMode) updateDraft({ bookingMode: next, scheduledDate: undefined, scheduledTime: undefined, mobileAddress: undefined });
   }, [data, draft.bookingMode, updateDraft]);
+  const removalNotice = useBookingServiceReconciliation(data?.services);
   const selectedModeMeta = MODE_OPTIONS.find((option) => option.value === selectedMode);
 
   const savedVehicle = vehicles.find((v) => v.id === draft.vehicleId);
@@ -132,6 +135,7 @@ export default function BookingDetailsScreen() {
             );
           })}
         </View>
+        <ServiceRemovalNotice message={removalNotice} />
       </AppCard>
 
       {selectedMode === 'mobile' ? <AppTextField label="Mobile service address" required maxLength={160} value={draft.mobileAddress ?? ''} onChangeText={(text) => updateDraft({ mobileAddress: clampLength(text.replace(/[<>]/g, ''), 160) })} placeholder="Enter the service address" /> : null}

@@ -72,12 +72,12 @@ export const demoVendors: VendorSummary[] = [
 ];
 
 export const demoServices: Service[] = [
-  { id: 'svc-1', vendorId: 'vendor-riverside', title: 'Tire Change', category: 'tire', durationMinutes: 45, price: 85, active: true },
-  { id: 'svc-2', vendorId: 'vendor-riverside', title: 'Oil Change', category: 'oil', durationMinutes: 30, price: 80, active: true },
-  { id: 'svc-3', vendorId: 'vendor-riverside', title: 'Brake Check', category: 'brakes', durationMinutes: 40, price: 45, active: true },
-  { id: 'svc-4', vendorId: 'vendor-precbn', title: 'Full Diagnostics', category: 'diagnostics', durationMinutes: 60, price: 120, active: true },
-  { id: 'svc-5', vendorId: 'vendor-precbn', title: 'Brake Pad Replacement', category: 'brakes', durationMinutes: 90, price: 210, active: true },
-  { id: 'svc-6', vendorId: 'vendor-body-paint', title: 'Scratch Repair', category: 'bodywork', durationMinutes: 120, price: 275, active: true },
+  { id: 'svc-1', vendorId: 'vendor-riverside', title: 'Tire Change', category: 'tire', durationMinutes: 45, price: 85, active: true, bookingEligibility: 'both' },
+  { id: 'svc-2', vendorId: 'vendor-riverside', title: 'Oil Change', category: 'oil', durationMinutes: 30, price: 80, active: true, bookingEligibility: 'both' },
+  { id: 'svc-3', vendorId: 'vendor-riverside', title: 'Brake Check', category: 'brakes', durationMinutes: 40, price: 45, active: true, bookingEligibility: 'both' },
+  { id: 'svc-4', vendorId: 'vendor-precbn', title: 'Full Diagnostics', category: 'diagnostics', durationMinutes: 60, price: 120, active: true, bookingEligibility: 'both' },
+  { id: 'svc-5', vendorId: 'vendor-precbn', title: 'Brake Pad Replacement', category: 'brakes', durationMinutes: 90, price: 210, active: true, bookingEligibility: 'both' },
+  { id: 'svc-6', vendorId: 'vendor-body-paint', title: 'Scratch Repair', category: 'bodywork', durationMinutes: 120, price: 275, active: true, bookingEligibility: 'both' },
 ];
 
 export const demoReviews: Review[] = [

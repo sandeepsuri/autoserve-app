@@ -31,7 +31,8 @@ import { durationSchema, priceSchema, requiredText, sanitizeTextInput } from '@/
 import { listVendorServices, removeVendorService, upsertVendorService } from '@/lib/vendor-admin';
 import { useVendorIdentity } from '@/lib/use-vendor-identity';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Service, ServiceCategory } from '@/types/domain';
+import { getServiceEligibility, SERVICE_ELIGIBILITY_LABELS, serviceEligibilityWarning } from '@/lib/booking-types';
+import { Service, ServiceCategory, ServiceEligibility, VendorSummary } from '@/types/domain';
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -58,6 +59,7 @@ const schema = z.object({
   category: z.string().min(2, 'Category is required'),
   durationMinutes: numericInputSchema(durationSchema, 1440, 'Enter a valid duration'),
   price: numericInputSchema(priceSchema, 100000, 'Enter a valid price'),
+  bookingEligibility: z.enum(['shop', 'mobile', 'both']),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -137,13 +139,16 @@ function currentMonthBookingCounts(
 interface ServiceModalProps {
   visible: boolean;
   editTarget: Service | null;
+  vendor: VendorSummary | null;
   vendorId: string;
   ownerId: string;
   onClose: () => void;
   onSaved: () => void;
 }
 
-function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved }: ServiceModalProps) {
+const ELIGIBILITY_OPTIONS: ServiceEligibility[] = ['both', 'shop', 'mobile'];
+
+function ServiceModal({ visible, editTarget, vendor, vendorId, ownerId, onClose, onSaved }: ServiceModalProps) {
   const queryClient = useQueryClient();
   const isEdit = editTarget !== null;
 
@@ -158,6 +163,7 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
       category: editTarget?.category ?? 'oil',
       durationMinutes: editTarget ? String(editTarget.durationMinutes) : '45',
       price: editTarget ? String(editTarget.price) : '95',
+      bookingEligibility: editTarget ? getServiceEligibility(editTarget) : 'both',
     },
     resolver: zodResolver(schema),
   });
@@ -169,6 +175,7 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
       category: editTarget?.category ?? 'oil',
       durationMinutes: editTarget ? String(editTarget.durationMinutes) : '45',
       price: editTarget ? String(editTarget.price) : '95',
+      bookingEligibility: editTarget ? getServiceEligibility(editTarget) : 'both',
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, editTarget?.id]);
@@ -184,6 +191,7 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
         durationMinutes: Number(values.durationMinutes),
         price: Number(values.price),
         active: editTarget?.active ?? true,
+        bookingEligibility: values.bookingEligibility,
       });
       await queryClient.invalidateQueries({ queryKey: ['vendor-services', ownerId] });
       await queryClient.invalidateQueries({ queryKey: ['vendor-detail', vendorId] });
@@ -299,6 +307,30 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
             )}
           />
 
+          <Text style={modalStyles.fieldLabel}>Booking type</Text>
+          <Controller
+            control={control}
+            name="bookingEligibility"
+            render={({ field: f }) => {
+              const warning = serviceEligibilityWarning(f.value, vendor);
+              return (
+                <>
+                  <View style={modalStyles.eligibilityChips}>
+                    {ELIGIBILITY_OPTIONS.map((option) => (
+                      <FilterChip
+                        key={option}
+                        label={SERVICE_ELIGIBILITY_LABELS[option]}
+                        active={f.value === option}
+                        onPress={() => f.onChange(option)}
+                      />
+                    ))}
+                  </View>
+                  {warning ? <Text style={modalStyles.errorText}>{warning}</Text> : null}
+                </>
+              );
+            }}
+          />
+
           <AppButton
             label={isSubmitting ? 'Saving…' : isEdit ? 'Save changes' : 'Add service'}
             variant="accent"
@@ -321,6 +353,11 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
 }
 
 const modalStyles = StyleSheet.create({
+  eligibilityChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: colors.bgBase,
@@ -472,14 +509,13 @@ const filterPanelStyles = StyleSheet.create({
 
 interface VendorServiceCardProps {
   service: Service;
-  modeLabel: string;
   monthlyCount: number;
   onToggle: (active: boolean) => void;
   onEdit: () => void;
   compact: boolean;
 }
 
-function VendorServiceCard({ service, modeLabel, monthlyCount, onToggle, onEdit, compact }: VendorServiceCardProps) {
+function VendorServiceCard({ service, monthlyCount, onToggle, onEdit, compact }: VendorServiceCardProps) {
   const { bg, fg } = categoryColors(service.category);
   const abbr = categoryAbbr(service.category);
 
@@ -494,7 +530,7 @@ function VendorServiceCard({ service, modeLabel, monthlyCount, onToggle, onEdit,
         <View style={cardStyles.nameBlock}>
           <Text style={cardStyles.serviceTitle} numberOfLines={2}>{service.title}</Text>
           <Text style={cardStyles.metaLabel}>
-            {CATEGORY_LABELS[service.category] ?? service.category} · {modeLabel}
+            {CATEGORY_LABELS[service.category] ?? service.category} · {SERVICE_ELIGIBILITY_LABELS[getServiceEligibility(service)]}
           </Text>
         </View>
 
@@ -695,9 +731,6 @@ export default function VendorServicesScreen() {
     [monthlyCountPerService],
   );
 
-  // Service mode label derived from vendor record
-  const modeLabel = vendor?.mobileServiceEnabled ? 'Mobile available' : 'In-shop';
-
   // Toolbar state
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
@@ -874,7 +907,6 @@ export default function VendorServicesScreen() {
               <VendorServiceCard
                 key={service.id}
                 service={service}
-                modeLabel={modeLabel}
                 compact={compact}
                 monthlyCount={monthlyCountPerService[service.id] ?? 0}
                 onToggle={(active) => handleToggle(service, active)}
@@ -890,6 +922,7 @@ export default function VendorServicesScreen() {
         <ServiceModal
           visible={modalVisible}
           editTarget={editTarget}
+          vendor={vendor}
           vendorId={vendorId}
           ownerId={ownerId}
           onClose={closeModal}

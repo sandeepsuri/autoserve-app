@@ -9,7 +9,7 @@ jest.mock('@/store/useAuthStore', () => ({ useAuthStore: { getState: () => ({ se
 
 const storage = new Map<string, string>();
 const service = (id: string): Service => ({
-  id, vendorId: 'vendor-1', title: `Oil Change ${id}`, category: 'oil', price: 50, durationMinutes: 30, active: true,
+  id, vendorId: 'vendor-1', title: `Oil Change ${id}`, category: 'oil', price: 50, durationMinutes: 30, active: true, bookingEligibility: 'both',
 });
 
 beforeEach(() => {

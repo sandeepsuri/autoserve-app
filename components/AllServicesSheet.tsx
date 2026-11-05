@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/AppButton';
 import { FilterChip } from '@/components/FilterChip';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
-import { bookingTypesLabel } from '@/lib/booking-types';
+import { bookingTypesLabel, isServiceEligible } from '@/lib/booking-types';
 import { BookingMode, Service, ServiceCategory } from '@/types/domain';
 
 interface Props {
@@ -39,8 +39,11 @@ function ServiceListCard({
   service: Service;
   bookingModes: BookingMode[];
 }) {
-  const modeLabel = bookingTypesLabel(bookingModes);
-  const modeIsGreen = bookingModes.includes('mobile');
+  const serviceModes = bookingModes.filter((mode) => isServiceEligible(service, mode));
+  const modeLabel = bookingModes.length && !serviceModes.length
+    ? 'Not currently bookable'
+    : bookingTypesLabel(serviceModes);
+  const modeIsGreen = serviceModes.includes('mobile');
 
   return (
     <View style={styles.card}>
@@ -118,7 +121,7 @@ export function AllServicesSheet({ visible, onClose, vendorName, bookingModes, s
     });
   }, [services, search, activeCategory]);
 
-  const subtitle = `${vendorName} offers ${services.length} bookable ${services.length === 1 ? 'service' : 'services'}. Compare price, duration, and mode before booking.`;
+  const subtitle = `${vendorName} offers ${services.length} ${services.length === 1 ? 'service' : 'services'}. Compare price, duration, and mode before booking.`;
 
   return (
     <Modal

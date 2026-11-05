@@ -2,6 +2,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
 import { Service, VendorSummary } from '@/types/domain';
 
+import { getServiceEligibility } from './booking-types';
+import { mapServiceRow } from './service-records';
 import { requiredText } from './validation';
 import { isSupabaseConfigured, supabase } from './supabase';
 
@@ -41,6 +43,7 @@ export async function getVendorForOwner(): Promise<VendorSummary | null> {
     distanceMiles: data.distance_miles ?? 0,
     rating: data.rating ?? 0,
     reviewCount: data.review_count ?? 0,
+    locationMode: data.location_mode ?? undefined,
     mobileServiceEnabled: data.mobile_service_enabled ?? false,
     serviceRadiusMiles: data.service_radius_miles ?? 0,
     nextAvailable: data.next_available ?? '',
@@ -73,17 +76,7 @@ export async function listVendorServices() {
   if (servicesResult.error) throw servicesResult.error;
   if (!servicesResult.data) return [];
 
-  return servicesResult.data.map((service) => ({
-    id: service.id,
-    vendorId: service.vendor_id,
-    title: service.title,
-    category: service.category,
-    description: service.description ?? undefined,
-    durationMinutes: service.duration_minutes,
-    price: service.price,
-    active: service.active ?? true,
-    image: service.image ?? undefined,
-  }));
+  return servicesResult.data.map(mapServiceRow);
 }
 
 export async function upsertVendorService(input: Service): Promise<Service> {
@@ -101,6 +94,7 @@ export async function upsertVendorService(input: Service): Promise<Service> {
     duration_minutes: service.durationMinutes,
     price: service.price,
     active: service.active,
+    booking_eligibility: getServiceEligibility(service),
     image: service.image ?? null,
   };
 
@@ -119,17 +113,7 @@ export async function upsertVendorService(input: Service): Promise<Service> {
     .single();
   if (error) throw error;
 
-  return {
-    id: data.id,
-    vendorId: data.vendor_id,
-    title: data.title,
-    category: data.category,
-    description: data.description ?? undefined,
-    durationMinutes: data.duration_minutes,
-    price: data.price,
-    active: data.active ?? true,
-    image: data.image ?? undefined,
-  };
+  return mapServiceRow(data);
 }
 
 export async function removeVendorService(serviceId: string) {

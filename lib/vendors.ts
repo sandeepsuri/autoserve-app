@@ -3,6 +3,7 @@ import { makeDefaultAvailability, makeEmptyAvailability } from '@/store/useVendo
 import { DiscoveryFilters, Review, Service, VendorAvailability, VendorSummary } from '@/types/domain';
 
 import { getBookableModes } from './booking-types';
+import { mapServiceRow } from './service-records';
 import { loadVendorAvailability } from './vendor-availability';
 import { isDemoDataEnabled, isSupabaseConfigured, supabase } from './supabase';
 
@@ -53,20 +54,6 @@ function mapVendorRow(item: Record<string, unknown>): VendorSummary {
   };
 }
 
-function mapServiceRow(item: Record<string, unknown>): Service {
-  return {
-    id: item.id as string,
-    vendorId: item.vendor_id as string,
-    title: item.title as string,
-    category: item.category as Service['category'],
-    durationMinutes: item.duration_minutes as number,
-    price: item.price as number,
-    active: (item.active as boolean) ?? true,
-    description: item.description as string | undefined,
-    image: item.image as string | undefined,
-  };
-}
-
 function mapReviewRow(item: Record<string, unknown>): Review {
   return {
     id: item.id as string,
@@ -99,7 +86,12 @@ export async function listVendors(filters: Partial<DiscoveryFilters> = {}) {
   if (!isSupabaseConfigured || !supabase) {
     const demo = useDemoDataStore.getState();
     return isDemoDataEnabled ? filterVendors(demo.vendors.map((vendor) => ({
-      ...vendor, bookingModes: getBookableModes(vendor, demo.vendorAvailabilities?.[vendor.id] ?? makeDefaultAvailability()),
+      ...vendor,
+      bookingModes: getBookableModes(
+        vendor,
+        demo.vendorAvailabilities?.[vendor.id] ?? makeDefaultAvailability(),
+        demo.services.filter((item) => item.vendorId === vendor.id && item.active),
+      ),
     })), merged) : [];
   }
 
@@ -131,9 +123,10 @@ export async function getVendorDetail(vendorId: string): Promise<{
     const demo = useDemoDataStore.getState();
     const vendor = demo.vendors.find((item) => item.id === vendorId) ?? null;
     const demoAvailability = demo.vendorAvailabilities?.[vendorId] ?? makeDefaultAvailability();
+    const demoServices = demo.services.filter((item) => item.vendorId === vendorId && item.active);
     return {
-      vendor: vendor ? { ...vendor, bookingModes: getBookableModes(vendor, demoAvailability) } : null,
-      services: demo.services.filter((item) => item.vendorId === vendorId && item.active),
+      vendor: vendor ? { ...vendor, bookingModes: getBookableModes(vendor, demoAvailability, demoServices) } : null,
+      services: demoServices,
       reviews: demoReviewsState.filter((item) => item.vendorId === vendorId),
       businessHours: [] as { day: string; hours: string }[],
       availability: demoAvailability,
@@ -174,11 +167,11 @@ export async function getVendorDetail(vendorId: string): Promise<{
 
   const vendorRow = vendorResult.data as unknown as Record<string, unknown>;
   const vendor = mapVendorRow(vendorRow);
-  vendor.bookingModes = getBookableModes(vendor, availability);
   const businessHours = Array.isArray(vendorRow.business_hours)
     ? (vendorRow.business_hours as { day: string; hours: string }[])
     : [];
   const services = (servicesResult.data ?? []).map(mapServiceRow);
+  vendor.bookingModes = getBookableModes(vendor, availability, services);
   const reviews = (reviewsResult.data ?? []).map(mapReviewRow);
 
   return { vendor, services, reviews, businessHours, availability };
