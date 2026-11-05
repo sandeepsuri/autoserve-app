@@ -1,52 +1,48 @@
-import { apiBaseUrl } from './api-config';
+import { getApiBaseUrl } from './api-config';
 
 export interface VehicleMake {
   label: string;
   path: string;
 }
+export type VehicleModel = VehicleMake;
+export type VehicleYear = VehicleMake;
 
-interface MakesResponse {
-  items: VehicleMake[];
+async function loadCatalog(step: string, params?: URLSearchParams): Promise<VehicleMake[]> {
+  const base = getApiBaseUrl();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${base}/api/v1/vehicle-selection/${step}${params ? `?${params.toString()}` : ''}`, {
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`Couldn't load ${step} (HTTP ${res.status}). Please try again.`);
+    }
+    const body: unknown = await res.json();
+    if (!body || typeof body !== 'object' || !('items' in body) || !Array.isArray(body.items) ||
+      !body.items.every((item: unknown) => item && typeof item === 'object' && 'label' in item &&
+        typeof item.label === 'string' && item.label.trim() && 'path' in item && typeof item.path === 'string')) {
+      throw new Error(`The vehicle service returned invalid ${step}. Please try again.`);
+    }
+    return body.items as VehicleMake[];
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(`Loading ${step} timed out. Check your connection and try again.`);
+    if (error instanceof TypeError) throw new Error(`Couldn't reach the vehicle service to load ${step}. Check your connection and try again.`);
+    if (error instanceof SyntaxError) throw new Error(`The vehicle service returned invalid ${step}. Please try again.`);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
-export async function listVehicleMakes(): Promise<VehicleMake[]> {
-  const res = await fetch(`${apiBaseUrl}/api/v1/vehicle-selection/makes`);
-  if (!res.ok) throw new Error(`Failed to load makes (${res.status})`);
-  const body = (await res.json()) as MakesResponse;
-  return body.items ?? [];
+export function listVehicleMakes(): Promise<VehicleMake[]> {
+  return loadCatalog('makes');
 }
 
-export interface VehicleModel {
-  label: string;
-  path: string;
+export function listVehicleModels(make: string): Promise<VehicleModel[]> {
+  return loadCatalog('models', new URLSearchParams({ make }));
 }
 
-interface ModelsResponse {
-  items: VehicleModel[];
-}
-
-export async function listVehicleModels(make: string): Promise<VehicleModel[]> {
-  const res = await fetch(
-    `${apiBaseUrl}/api/v1/vehicle-selection/models?make=${encodeURIComponent(make)}`,
-  );
-  if (!res.ok) throw new Error(`Failed to load models (${res.status})`);
-  const body = (await res.json()) as ModelsResponse;
-  return body.items ?? [];
-}
-
-export interface VehicleYear {
-  label: string;
-  path: string;
-}
-
-interface YearsResponse {
-  items: VehicleYear[];
-}
-
-export async function listVehicleYears(make: string, model: string): Promise<VehicleYear[]> {
-  const params = new URLSearchParams({ make, model });
-  const res = await fetch(`${apiBaseUrl}/api/v1/vehicle-selection/years?${params.toString()}`);
-  if (!res.ok) throw new Error(`Failed to load years (${res.status})`);
-  const body = (await res.json()) as YearsResponse;
-  return body.items ?? [];
+export function listVehicleYears(make: string, model: string): Promise<VehicleYear[]> {
+  return loadCatalog('years', new URLSearchParams({ make, model }));
 }
