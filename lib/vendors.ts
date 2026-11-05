@@ -22,7 +22,6 @@ const defaultFilters: DiscoveryFilters = {
   mobileOnly: false,
   minimumRating: 0,
   category: 'all',
-  maxDistanceMiles: 30,
 };
 
 function mapVendorRow(item: Record<string, unknown>): VendorSummary {
@@ -89,10 +88,9 @@ function filterVendors(vendors: VendorSummary[], filters: DiscoveryFilters) {
       vendor.description.toLowerCase().includes(filters.query.toLowerCase());
     const matchesMobile = !filters.mobileOnly || vendor.bookingModes?.includes('mobile');
     const matchesRating = vendor.rating >= filters.minimumRating;
-    const matchesDistance = vendor.distanceMiles <= filters.maxDistanceMiles;
     const matchesCategory = filters.category === 'all' || vendor.serviceCategories.includes(filters.category);
 
-    return matchesQuery && matchesMobile && matchesRating && matchesDistance && matchesCategory;
+    return matchesQuery && matchesMobile && matchesRating && matchesCategory;
   });
 }
 

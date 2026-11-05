@@ -13,6 +13,7 @@ import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import { isBookableMode } from '@/lib/booking-types';
+import { useBookingBack } from '@/lib/booking-navigation';
 import { clampLength } from '@/lib/validation';
 import { listVehicles } from '@/lib/vehicles';
 import { getVendorDetail } from '@/lib/vendors';
@@ -38,6 +39,10 @@ export default function BookingDetailsScreen() {
   const { draft, updateDraft } = useBookingDraftStore();
   const { session, guestClientId } = useAuthStore();
   const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
+
+  const handleBack = useBookingBack({
+    back: () => router.navigate('/(client)/booking/vehicle'),
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['booking-vendor-details', draft.vendorId],
@@ -90,6 +95,7 @@ export default function BookingDetailsScreen() {
         title="1. Booking details"
         subtitle="Confirm the vehicle, choose how the service happens, and share any issue details for the mechanic."
         fallbackHref="/(client)/booking/vehicle"
+        onBack={handleBack}
       />
 
       <BookingSummaryCard

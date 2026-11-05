@@ -1,20 +1,13 @@
-import { useRouter } from 'expo-router';
 import { Text } from 'react-native';
 
-import { AppButton } from '@/components/AppButton';
 import { BookingSummaryCard } from '@/components/BookingSummaryCard';
 import { Screen } from '@/components/Screen';
+import { SignOutButton } from '@/components/SignOutButton';
 import { typography } from '@/constants/theme';
-import { signOut } from '@/lib/auth';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export default function ClientProfileScreen() {
-  const router = useRouter();
   const { profile, session, guestMode } = useAuthStore();
-  const handleSignOut = async () => {
-    await signOut();
-    router.replace('/(auth)');
-  };
 
   return (
     <Screen>
@@ -28,7 +21,7 @@ export default function ClientProfileScreen() {
         ]}
       />
 
-      {session ? <AppButton label="Sign Out" variant="secondary" onPress={handleSignOut} /> : null}
+      {session ? <SignOutButton /> : null}
     </Screen>
   );
 }

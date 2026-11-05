@@ -12,6 +12,7 @@ import { Screen } from '@/components/Screen';
 import { SearchablePicker } from '@/components/SearchablePicker';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import { BOOKING_TYPE_LABELS, isBookableMode } from '@/lib/booking-types';
+import { useBookingBack } from '@/lib/booking-navigation';
 import { addDays, startOfDay, toDateKey } from '@/lib/format';
 import { guestBookingContactSchema, guestVehicleSchema, sanitizeText } from '@/lib/validation';
 import { listVehicleMakes, listVehicleModels, listVehicleYears } from '@/lib/vehicle-catalog';
@@ -31,19 +32,32 @@ export default function GuestBookingDetailsScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useBookingDraftStore();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const handleBack = useBookingBack({
+    exitsFlow: true,
+    back: () => {
+      if (router.canGoBack()) router.back();
+      else router.replace(`/(public)/shop/${vendorId}`);
+    },
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['guest-booking-vendor', vendorId],
     queryFn: () => getVendorDetail(vendorId),
     enabled: Boolean(vendorId),
   });
-  const { data: makes = [], isLoading: makesLoading } = useQuery({ queryKey: ['vehicle-makes'], queryFn: listVehicleMakes });
-  const { data: models = [], isLoading: modelsLoading } = useQuery({
+  const { data: makes = [], isFetching: makesLoading, error: makesError, refetch: retryMakes } = useQuery({
+    retry: false,
+    queryKey: ['vehicle-makes'],
+    queryFn: listVehicleMakes,
+  });
+  const { data: models = [], isFetching: modelsLoading, error: modelsError, refetch: retryModels } = useQuery({
+    retry: false,
     queryKey: ['vehicle-models', draft.vehicleMake],
     queryFn: () => listVehicleModels(draft.vehicleMake!),
     enabled: Boolean(draft.vehicleMake),
   });
-  const { data: years = [], isLoading: yearsLoading } = useQuery({
+  const { data: years = [], isFetching: yearsLoading, error: yearsError, refetch: retryYears } = useQuery({
+    retry: false,
     queryKey: ['vehicle-years', draft.vehicleMake, draft.vehicleModel],
     queryFn: () => listVehicleYears(draft.vehicleMake!, draft.vehicleModel!),
     enabled: Boolean(draft.vehicleMake && draft.vehicleModel),
@@ -69,22 +83,24 @@ export default function GuestBookingDetailsScreen() {
     [data?.availability, draft.scheduledDate, mode],
   );
 
+  // Both defaults need a vendor so a cleared draft stays cleared while this
+  // screen is still mounted during the transition out.
   useEffect(() => {
-    if (dateOptions.length && (!draft.scheduledDate || !dateOptions.includes(draft.scheduledDate))) {
+    if (draft.vendorId && dateOptions.length && (!draft.scheduledDate || !dateOptions.includes(draft.scheduledDate))) {
       updateDraft({ scheduledDate: dateOptions[0], scheduledTime: undefined });
     }
-  }, [dateOptions, draft.scheduledDate, updateDraft]);
+  }, [dateOptions, draft.scheduledDate, draft.vendorId, updateDraft]);
 
   useEffect(() => {
-    if (timeOptions.length && (!draft.scheduledTime || !timeOptions.includes(draft.scheduledTime))) {
+    if (draft.vendorId && timeOptions.length && (!draft.scheduledTime || !timeOptions.includes(draft.scheduledTime))) {
       updateDraft({ scheduledTime: timeOptions[0] });
     }
-  }, [draft.scheduledTime, timeOptions, updateDraft]);
+  }, [draft.scheduledTime, draft.vendorId, timeOptions, updateDraft]);
 
-  if (isLoading) return <Screen><AppHeader title="Guest booking" fallbackHref={`/(public)/shop/${vendorId}` as never} /></Screen>;
-  if (!vendor) return <Screen><AppHeader fallbackHref="/(public)/discover" /><EmptyState title="Vendor unavailable" body="Return to discovery and choose another provider." /></Screen>;
+  if (isLoading) return <Screen><AppHeader title="Guest booking" fallbackHref={`/(public)/shop/${vendorId}` as never} onBack={handleBack} /></Screen>;
+  if (!vendor) return <Screen><AppHeader fallbackHref="/(public)/discover" onBack={handleBack} /><EmptyState title="Vendor unavailable" body="Return to discovery and choose another provider." /></Screen>;
 
-  if (!modes.length) return <Screen><AppHeader fallbackHref={`/(public)/shop/${vendorId}` as never} /><EmptyState title="Bookings unavailable" body="This vendor is not currently accepting Shop Visits or Mobile Service." /></Screen>;
+  if (!modes.length) return <Screen><AppHeader fallbackHref={`/(public)/shop/${vendorId}` as never} onBack={handleBack} /><EmptyState title="Bookings unavailable" body="This vendor is not currently accepting Shop Visits or Mobile Service." /></Screen>;
 
   const toggleService = (serviceId: string) => {
     const next = selectedServiceIds.includes(serviceId)
@@ -115,7 +131,7 @@ export default function GuestBookingDetailsScreen() {
 
   return (
     <Screen>
-      <AppHeader title="Guest booking · Step 1 of 2" subtitle="No account or saved garage required. These details are used for this request only." fallbackHref={`/(public)/shop/${vendor.id}` as never} />
+      <AppHeader title="Guest booking · Step 1 of 2" subtitle="No account or saved garage required. These details are used for this request only." fallbackHref={`/(public)/shop/${vendor.id}` as never} onBack={handleBack} />
       <View style={styles.progress}><View style={styles.progressActive} /><View style={styles.progressIdle} /></View>
       <AppCard style={styles.vendorCard}><Text style={typography.titleSm}>{vendor.name}</Text><Text style={styles.secondary}>{vendor.address}</Text></AppCard>
 
@@ -128,9 +144,9 @@ export default function GuestBookingDetailsScreen() {
 
       <AppCard style={styles.section}>
         <Text style={typography.titleSm}>Vehicle details</Text><Text style={styles.secondary}>This vehicle will not be saved to a profile or garage.</Text>
-        <SearchablePicker label="Make" required value={draft.vehicleMake ?? ''} options={makes} isLoading={makesLoading} errorText={errors.make} placeholder="Search or enter make" onChange={(value) => updateDraft({ vehicleMake: value, vehicleModel: undefined, vehicleYear: undefined })} />
-        <SearchablePicker label="Model" required value={draft.vehicleModel ?? ''} options={models} isLoading={modelsLoading} errorText={errors.model} placeholder="Search or enter model" disabled={!draft.vehicleMake} disabledHelperText="Choose a make first" onChange={(value) => updateDraft({ vehicleModel: value, vehicleYear: undefined })} />
-        <SearchablePicker label="Year" required value={draft.vehicleYear ?? ''} options={years} isLoading={yearsLoading} errorText={errors.year} placeholder="Search or enter year" disabled={!draft.vehicleModel} disabledHelperText="Choose a model first" onChange={(value) => updateDraft({ vehicleYear: value })} />
+        <SearchablePicker label="Make" required value={draft.vehicleMake ?? ''} options={makes} isLoading={makesLoading} loadError={makesError?.message} onRetry={() => { void retryMakes(); }} errorText={errors.make} placeholder="Search or enter make" onChange={(value) => updateDraft({ vehicleMake: value, vehicleModel: undefined, vehicleYear: undefined })} />
+        <SearchablePicker label="Model" required value={draft.vehicleModel ?? ''} options={models} isLoading={modelsLoading} loadError={modelsError?.message} onRetry={() => { void retryModels(); }} errorText={errors.model} placeholder="Search or enter model" disabled={!draft.vehicleMake} disabledHelperText="Choose a make first" onChange={(value) => updateDraft({ vehicleModel: value, vehicleYear: undefined })} />
+        <SearchablePicker label="Year" required value={draft.vehicleYear ?? ''} options={years} isLoading={yearsLoading} loadError={yearsError?.message} onRetry={() => { void retryYears(); }} errorText={errors.year} placeholder="Search or enter year" disabled={!draft.vehicleModel} disabledHelperText="Choose a model first" onChange={(value) => updateDraft({ vehicleYear: value })} />
         <AppTextField label="Trim" value={draft.vehicleTrim ?? ''} onChangeText={(text) => updateDraft({ vehicleTrim: sanitizeText(text, 60) })} placeholder="Optional" />
         <View style={styles.twoColumn}><View style={styles.flex}><AppTextField label="Colour" value={draft.vehicleColor ?? ''} onChangeText={(text) => updateDraft({ vehicleColor: sanitizeText(text, 30) })} placeholder="Optional" /></View><View style={styles.flex}><AppTextField label="License plate" value={draft.vehiclePlate ?? ''} onChangeText={(text) => updateDraft({ vehiclePlate: text.replace(/[<>]/g, '').slice(0, 12).toUpperCase() })} placeholder="Optional" autoCapitalize="characters" /></View></View>
       </AppCard>

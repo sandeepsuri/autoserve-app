@@ -17,7 +17,11 @@ const { create } = require('react-test-renderer');
 const { act } = React;
 const mockPush = jest.fn();
 let mockData: any;
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }), useLocalSearchParams: () => ({ vendorId: 'vendor-21' }) }));
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush }),
+  useLocalSearchParams: () => ({ vendorId: 'vendor-21' }),
+  useFocusEffect: (callback: () => void) => jest.requireActual('react').useEffect(callback, [callback]),
+}));
 jest.mock('@tanstack/react-query', () => ({ useQuery: ({ queryKey }: any) => ({
   data: queryKey[0] === 'client-vehicles' ? [{ id: 'vehicle-21', year: '2024', make: 'Honda', model: 'Civic' }]
     : queryKey[0].startsWith('vehicle-') ? [] : mockData,

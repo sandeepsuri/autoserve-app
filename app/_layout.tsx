@@ -49,7 +49,8 @@ export default function RootLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="(public)" />
             <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(client)" />
+            {/* An iOS swipe would pop the whole client area back to Welcome. */}
+            <Stack.Screen name="(client)" options={{ gestureEnabled: false }} />
             <Stack.Screen name="(vendor)" />
           </Stack>
           <StatusBar style="dark" />

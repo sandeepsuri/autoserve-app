@@ -49,6 +49,16 @@ npm run web
 
 Preview and production builds are managed through Expo/EAS using private project configuration.
 
+Set `EXPO_PUBLIC_API_BASE_URL` to the deployed backend URL in both the `preview`
+and `production` EAS environments before building. It must be an absolute HTTP(S)
+URL, for example `https://api.example.com`. Release builds reject missing URLs
+and localhost/loopback addresses. The backend must expose
+`/api/v1/vehicle-selection/makes`, `/models?make=…`, and `/years?make=…&model=…`,
+returning `{ "items": [{ "label": "…", "path": "…" }] }`.
+Rebuild after changing this public variable because Expo embeds it in the bundle.
+Local development defaults to `http://localhost:3000`; use your computer's LAN
+address when testing on a physical device.
+
 ## Testing
 
 Run the unit test suite:

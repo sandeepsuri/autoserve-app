@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { AppButton } from '@/components/AppButton';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 
 const DROPDOWN_MAX_HEIGHT = 280;
@@ -11,6 +12,8 @@ interface Props {
   onChange: (val: string) => void;
   options: { label: string }[];
   isLoading?: boolean;
+  loadError?: string;
+  onRetry?: () => void;
   placeholder?: string;
   required?: boolean;
   errorText?: string;
@@ -25,6 +28,8 @@ export function SearchablePicker({
   onChange,
   options,
   isLoading,
+  loadError,
+  onRetry,
   placeholder,
   required,
   errorText,
@@ -41,7 +46,7 @@ export function SearchablePicker({
     : options;
 
   const exactMatch = options.some((o) => o.label.toLowerCase() === lc);
-  const showManualFallback = value.trim().length > 0 && !exactMatch;
+  const showManualFallback = !isLoading && !loadError && value.trim().length > 0 && !exactMatch;
   const showDropdown = open && !disabled;
 
   const handleSelect = (val: string) => {
@@ -89,40 +94,50 @@ export function SearchablePicker({
         <Text style={styles.errorText}>{errorText}</Text>
       ) : null}
 
-      {showDropdown ? (
+      {!disabled && isLoading ? (
+        <View accessibilityRole="progressbar" accessibilityLabel={`Loading ${label.toLowerCase()}`} style={styles.loading}>
+          <ActivityIndicator size="small" color={colors.surfaceAccent} />
+          <Text style={styles.statusText}>{`Loading ${label.toLowerCase()}…`}</Text>
+        </View>
+      ) : !disabled && loadError ? (
+        <View accessibilityLiveRegion="polite" style={styles.status}>
+          <Text style={styles.errorText}>{loadError}</Text>
+          <AppButton label={`Retry ${label.toLowerCase()}`} variant="secondary" onPress={onRetry} />
+        </View>
+      ) : null}
+
+      {showDropdown && !isLoading && !loadError ? (
         <View style={styles.dropdown}>
-          {isLoading ? (
-            <ActivityIndicator size="small" color={colors.surfaceAccent} style={styles.spinner} />
-          ) : (
-            <ScrollView
-              style={styles.dropdownScroll}
-              keyboardShouldPersistTaps="handled"
-              nestedScrollEnabled
-            >
-              {filtered.map((item) => (
-                <Pressable
-                  key={item.label}
-                  style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-                  onPress={() => handleSelect(item.label)}
-                >
-                  <Text style={styles.itemText}>{item.label}</Text>
-                </Pressable>
-              ))}
+          <ScrollView
+            style={styles.dropdownScroll}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
+            {filtered.map((item) => (
+              <Pressable
+                key={item.label}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${item.label}`}
+                style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+                onPress={() => handleSelect(item.label)}
+              >
+                <Text style={styles.itemText}>{item.label}</Text>
+              </Pressable>
+            ))}
 
-              {showManualFallback ? (
-                <Pressable
-                  style={({ pressed }) => [styles.item, styles.itemManual, pressed && styles.itemPressed]}
-                  onPress={() => handleSelect(value.trim())}
-                >
-                  <Text style={styles.itemManualText}>{`+ Use "${value.trim()}"`}</Text>
-                </Pressable>
-              ) : null}
+            {showManualFallback ? (
+              <Pressable
+                style={({ pressed }) => [styles.item, styles.itemManual, pressed && styles.itemPressed]}
+                onPress={() => handleSelect(value.trim())}
+              >
+                <Text style={styles.itemManualText}>{`+ Use "${value.trim()}"`}</Text>
+              </Pressable>
+            ) : null}
 
-              {filtered.length === 0 && !showManualFallback ? (
-                <Text style={styles.emptyText}>No options — type to enter manually</Text>
-              ) : null}
-            </ScrollView>
-          )}
+            {filtered.length === 0 && !showManualFallback ? (
+              <Text style={styles.emptyText}>No options — type to enter manually</Text>
+            ) : null}
+          </ScrollView>
         </View>
       ) : null}
     </View>
@@ -130,6 +145,9 @@ export function SearchablePicker({
 }
 
 const styles = StyleSheet.create({
+  loading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  status: { gap: spacing.sm },
+  statusText: { ...typography.caption, color: colors.textSecondary },
   wrapper: {
     gap: spacing.xs,
     // zIndex so the dropdown floats over sibling fields
@@ -177,9 +195,6 @@ const styles = StyleSheet.create({
   },
   dropdownScroll: {
     maxHeight: DROPDOWN_MAX_HEIGHT,
-  },
-  spinner: {
-    paddingVertical: spacing.lg,
   },
   item: {
     paddingHorizontal: spacing.lg,

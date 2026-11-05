@@ -127,14 +127,12 @@ describe('listVendors — filtering', () => {
     expect(await listVendors({ query: 'european' })).toHaveLength(1);
   });
 
-  it('maxDistanceMiles excludes vendors beyond the limit', async () => {
+  it('does not filter on the stored distance_miles, which ignores where the client is', async () => {
     mockSupabaseRows([
       makeVendor({ id: 'v1', distanceMiles: 5 }),
-      makeVendor({ id: 'v2', distanceMiles: 35 }),
+      makeVendor({ id: 'v2', distanceMiles: 3500 }),
     ]);
-    const result = await listVendors({ maxDistanceMiles: 10 });
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('v1');
+    expect(await listVendors()).toHaveLength(2);
   });
 
   it('combined filters apply intersection logic', async () => {

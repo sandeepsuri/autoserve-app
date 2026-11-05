@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
 import {
-  Dimensions,
   FlatList,
   Modal,
   Pressable,
@@ -11,14 +10,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { FilterChip } from '@/components/FilterChip';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { bookingTypesLabel } from '@/lib/booking-types';
 import { BookingMode, Service, ServiceCategory } from '@/types/domain';
-
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 interface Props {
   visible: boolean;
@@ -36,30 +34,26 @@ function capitalize(s: string): string {
 
 function ServiceListCard({
   service,
-  isFeatured,
   bookingModes,
 }: {
   service: Service;
-  isFeatured: boolean;
   bookingModes: BookingMode[];
 }) {
   const modeLabel = bookingTypesLabel(bookingModes);
   const modeIsGreen = bookingModes.includes('mobile');
 
   return (
-    <View style={[styles.card, isFeatured && styles.cardFeatured]}>
+    <View style={styles.card}>
       {/* Accent bar — sits flush at the top, no seam because overflow:hidden on card */}
-      <View style={[styles.accentBar, isFeatured ? styles.accentBarOrange : styles.accentBarBrand]} />
+      <View style={styles.accentBar} />
       <View style={styles.cardInner}>
         {/* Top row: copy + price stack */}
         <View style={styles.cardTop}>
           <View style={styles.cardCopy}>
-            <Text style={styles.cardTitle}>{service.title}</Text>
-            {service.description ? (
-              <Text style={styles.cardDescription} numberOfLines={3}>
-                {service.description}
-              </Text>
-            ) : null}
+            <Text style={styles.cardTitle} numberOfLines={2}>{service.title}</Text>
+            <Text style={styles.cardDescription} numberOfLines={3}>
+              {service.description ?? ''}
+            </Text>
           </View>
           <View style={styles.priceStack}>
             {service.price != null ? (
@@ -90,6 +84,7 @@ function ServiceListCard({
 }
 
 export function AllServicesSheet({ visible, onClose, vendorName, bookingModes, services, onBook }: Props) {
+  const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<'all' | ServiceCategory>('all');
 
@@ -132,6 +127,7 @@ export function AllServicesSheet({ visible, onClose, vendorName, bookingModes, s
       animationType="slide"
       onRequestClose={onClose}
       statusBarTranslucent
+      navigationBarTranslucent
     >
       {/* Outer container pins the sheet to the bottom */}
       <View style={styles.overlay}>
@@ -139,7 +135,7 @@ export function AllServicesSheet({ visible, onClose, vendorName, bookingModes, s
             Kept out of the sheet subtree so it never intercepts list scroll gestures. */}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         {/* Sheet: a plain View (not a Pressable) so the FlatList owns its pan gestures */}
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingLeft: insets.left, paddingRight: insets.right }]}>
           {/* Grabber */}
           <View style={styles.grabberRow}>
             <View style={styles.grabber} />
@@ -152,7 +148,7 @@ export function AllServicesSheet({ visible, onClose, vendorName, bookingModes, s
                 <Text style={styles.sheetTitle}>All services</Text>
                 <Text style={styles.sheetSubtitle}>{subtitle}</Text>
               </View>
-              <Pressable style={styles.closeButton} onPress={onClose} hitSlop={8}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close all services" style={styles.closeButton} onPress={onClose} hitSlop={8}>
                 <Ionicons name="close" size={20} color={colors.surfaceBrand} />
               </Pressable>
             </View>
@@ -163,12 +159,23 @@ export function AllServicesSheet({ visible, onClose, vendorName, bookingModes, s
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search services"
+                accessibilityLabel="Search services"
                 placeholderTextColor={colors.textTertiary}
                 value={search}
                 onChangeText={setSearch}
                 returnKeyType="search"
-                clearButtonMode="while-editing"
+                clearButtonMode="never"
               />
+              {search.length > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear service search"
+                  onPress={() => setSearch('')}
+                  style={styles.clearSearchButton}
+                >
+                  <Ionicons name="close" size={20} color={colors.surfaceBrand} />
+                </Pressable>
+              ) : null}
             </View>
           </View>
 
@@ -220,10 +227,9 @@ export function AllServicesSheet({ visible, onClose, vendorName, bookingModes, s
                 )}
               </View>
             }
-            renderItem={({ item, index }) => (
+            renderItem={({ item }) => (
               <ServiceListCard
                 service={item}
-                isFeatured={index === 0}
                 bookingModes={bookingModes}
               />
             )}
@@ -231,7 +237,7 @@ export function AllServicesSheet({ visible, onClose, vendorName, bookingModes, s
           />
 
           {/* Footer */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { paddingBottom: spacing.xl + insets.bottom }]}>
             <AppButton
               label="Close"
               variant="secondary"
@@ -263,7 +269,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     // Definite height (not maxHeight) so the flex:1 list has space to fill and scroll
-    height: SCREEN_HEIGHT * 0.88,
+    height: '88%',
     flexDirection: 'column',
     ...shadows.card,
   },
@@ -344,6 +350,13 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     paddingVertical: 0,
   },
+  clearSearchButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: -spacing.md,
+  },
 
   // Categories
   categoryBorder: {
@@ -405,17 +418,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadows.card,
   },
-  cardFeatured: {
-    borderColor: 'rgba(255,122,26,0.35)',
-  },
   accentBar: {
     height: 7,
     width: '100%',
-  },
-  accentBarOrange: {
-    backgroundColor: colors.surfaceAccent,
-  },
-  accentBarBrand: {
     backgroundColor: colors.surfaceBrand,
   },
   cardInner: {
@@ -436,6 +441,7 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 20,
     lineHeight: 24,
+    minHeight: 48,
     color: colors.textPrimary,
   },
   cardDescription: {
@@ -443,6 +449,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+    minHeight: 60,
   },
   priceStack: {
     alignItems: 'flex-end',

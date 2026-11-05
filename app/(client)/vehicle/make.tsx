@@ -14,7 +14,8 @@ import { useBookingDraftStore } from '@/store/useBookingDraftStore';
 export default function VehicleMakeScreen() {
   const router = useRouter();
   const updateDraft = useBookingDraftStore((state) => state.updateDraft);
-  const { data, isLoading, isError } = useQuery({
+  const { data, isFetching: isLoading, isError, error, refetch } = useQuery({
+    retry: false,
     queryKey: ['vehicle-makes'],
     queryFn: listVehicleMakes,
   });
@@ -26,7 +27,10 @@ export default function VehicleMakeScreen() {
       {isLoading ? (
         <ActivityIndicator style={styles.loader} color={colors.surfaceAccent} />
       ) : isError ? (
-        <EmptyState title="Couldn't load makes" body="Check your connection and try again." />
+        <>
+          <EmptyState title="Couldn't load makes" body={error?.message ?? 'Check your connection and try again.'} />
+          <AppButton label="Retry makes" variant="secondary" onPress={() => { void refetch(); }} />
+        </>
       ) : data && data.length === 0 ? (
         <EmptyState title="No makes available" body="No vehicle makes are available right now." />
       ) : (
