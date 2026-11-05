@@ -1,8 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { z } from 'zod';
 
 import { AppHeader } from '@/components/AppHeader';
@@ -32,6 +33,7 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const postAuthPath = useAuthStore((state) => state.postAuthPath);
   const setGuestMode = useAuthStore((state) => state.setGuestMode);
   const setPostAuthPath = useAuthStore((state) => state.setPostAuthPath);
@@ -64,6 +66,11 @@ export default function AuthScreen() {
     router.replace(destination.path as never);
   };
 
+  const switchMode = (nextMode: 'login' | 'signup') => {
+    setMode(nextMode);
+    setPasswordVisible(false);
+  };
+
   const onSubmit = handleSubmit(async (values) => {
     const email = values.email.trim().toLowerCase();
     const fullName = values.fullName ? sanitizeName(values.fullName) : '';
@@ -94,8 +101,8 @@ export default function AuthScreen() {
       />
 
       <View style={styles.toggleRow}>
-        <AppButton label="Log In" variant={mode === 'login' ? 'primary' : 'secondary'} style={styles.half} onPress={() => setMode('login')} />
-        <AppButton label="Sign Up" variant={mode === 'signup' ? 'primary' : 'secondary'} style={styles.half} onPress={() => setMode('signup')} />
+        <AppButton label="Log In" variant={mode === 'login' ? 'primary' : 'secondary'} style={styles.half} onPress={() => switchMode('login')} />
+        <AppButton label="Sign Up" variant={mode === 'signup' ? 'primary' : 'secondary'} style={styles.half} onPress={() => switchMode('signup')} />
       </View>
 
       {mode === 'signup' ? (
@@ -143,15 +150,28 @@ export default function AuthScreen() {
         name="password"
         render={({ field: { onChange, value } }) => (
           <View>
-            <TextInput
-              secureTextEntry
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor={colors.textTertiary}
-              value={value}
-              onChangeText={onChange}
-              maxLength={72}
-            />
+            <View style={styles.passwordRow}>
+              <TextInput
+                secureTextEntry={!passwordVisible}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[styles.input, styles.passwordInput]}
+                placeholder="Password"
+                placeholderTextColor={colors.textTertiary}
+                value={value}
+                onChangeText={onChange}
+                maxLength={72}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+                hitSlop={8}
+                onPress={() => setPasswordVisible((visible) => !visible)}
+                style={styles.passwordToggle}
+              >
+                <Ionicons name={passwordVisible ? 'eye-off-outline' : 'eye-outline'} size={22} color={colors.textSecondary} />
+              </Pressable>
+            </View>
             {errors.password?.message ? <Text style={styles.fieldError}>{errors.password.message}</Text> : null}
           </View>
         )}
@@ -219,6 +239,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     color: colors.textPrimary,
     fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  passwordRow: {
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: 56,
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: spacing.md,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingOverlay: {
     flex: 1,

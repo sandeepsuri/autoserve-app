@@ -6,6 +6,7 @@ import { VendorSummary } from '@/types/domain';
 interface Props {
   vendors: VendorSummary[];
   height?: number;
+  clientCoords?: { latitude: number; longitude: number } | null;
 }
 
 export function MapPreview({ vendors, height = 240 }: Props) {

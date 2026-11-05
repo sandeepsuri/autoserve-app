@@ -1,20 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { EmptyState } from '@/components/EmptyState';
 import { FilterChip } from '@/components/FilterChip';
+import { LocationStatusBanner } from '@/components/LocationStatusBanner';
 import { MapPreview } from '@/components/MapPreview';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { VendorCard } from '@/components/VendorCard';
 import { colors, spacing, typography } from '@/constants/theme';
+import { DEFAULT_NEARBY_RADIUS_MILES, rankVendorsForClient } from '@/lib/discovery-location';
 import { sanitizeText } from '@/lib/validation';
 import { listVendors } from '@/lib/vendors';
 import { useAuthStore } from '@/store/useAuthStore';
+import { startClientLocationTracking, useClientLocationStore } from '@/store/useClientLocationStore';
 
 interface Props {
   shopRoute?: string;
@@ -27,12 +29,12 @@ export function DiscoverScreen({ shopRoute = '/(public)/shop' }: Props) {
   const [query, setQuery] = useState('');
   const [mobileOnly, setMobileOnly] = useState(false);
   const [minimumRating, setMinimumRating] = useState(0);
+  const [withinRadius, setWithinRadius] = useState(true);
+  const clientCoords = useClientLocationStore((state) => state.coordinates);
 
-  useEffect(() => {
-    Location.requestForegroundPermissionsAsync().catch(() => undefined);
-  }, []);
+  useFocusEffect(startClientLocationTracking);
 
-  const { data: vendors = [], error, isLoading } = useQuery({
+  const { data: matchingVendors = [], error, isLoading } = useQuery({
     queryKey: ['vendors', query, mobileOnly, minimumRating],
     queryFn: () =>
       listVendors({
@@ -43,7 +45,11 @@ export function DiscoverScreen({ shopRoute = '/(public)/shop' }: Props) {
       }),
   });
 
-  const featuredVendor = useMemo(() => vendors[0], [vendors]);
+  const { vendors, outsideRadiusCount } = useMemo(
+    () => rankVendorsForClient(matchingVendors, clientCoords, withinRadius ? DEFAULT_NEARBY_RADIUS_MILES : null),
+    [matchingVendors, clientCoords, withinRadius],
+  );
+  const featuredVendor = vendors[0];
 
   return (
     <Screen>
@@ -76,6 +82,8 @@ export function DiscoverScreen({ shopRoute = '/(public)/shop' }: Props) {
         ) : null}
       </View>
 
+      <LocationStatusBanner />
+
       <TextInput
         value={query}
         onChangeText={(text) => setQuery(sanitizeText(text, 80))}
@@ -93,9 +101,16 @@ export function DiscoverScreen({ shopRoute = '/(public)/shop' }: Props) {
       <View style={styles.inline}>
         <FilterChip label="Mobile Service" active={mobileOnly} onPress={() => setMobileOnly((value) => !value)} />
         <FilterChip label="Rating 4.5+" active={minimumRating === 4.5} onPress={() => setMinimumRating((value) => (value === 4.5 ? 0 : 4.5))} />
+        {clientCoords ? (
+          <FilterChip
+            label={`Within ${DEFAULT_NEARBY_RADIUS_MILES} mi`}
+            active={withinRadius}
+            onPress={() => setWithinRadius((value) => !value)}
+          />
+        ) : null}
       </View>
 
-      {view === 'map' ? <MapPreview vendors={vendors} /> : null}
+      {view === 'map' ? <MapPreview vendors={vendors} clientCoords={clientCoords} /> : null}
 
       {featuredVendor && view === 'map' ? (
         <Pressable onPress={() => router.push(`${shopRoute}/${featuredVendor.id}` as never)}>
@@ -118,14 +133,22 @@ export function DiscoverScreen({ shopRoute = '/(public)/shop' }: Props) {
           <VendorCard
             key={vendor.id}
             vendor={vendor}
+            distanceMiles={vendor.distanceFromClientMiles}
             onPress={() => router.push(`${shopRoute}/${vendor.id}` as never)}
             onBook={() => router.push(`${shopRoute}/${vendor.id}` as never)}
           />
         ))
+      ) : outsideRadiusCount > 0 ? (
+        <EmptyState
+          title={`No shops within ${DEFAULT_NEARBY_RADIUS_MILES} mi`}
+          body="There are shops further away. Show them all, sorted by distance."
+          actionLabel="Show all shops"
+          onAction={() => setWithinRadius(false)}
+        />
       ) : (
         <EmptyState
           title="No shops match these filters"
-          body="Try expanding the distance or turning off the mobile-only filter to see more options nearby."
+          body="Try changing your search or turning off a filter to see more options."
         />
       )}
     </Screen>

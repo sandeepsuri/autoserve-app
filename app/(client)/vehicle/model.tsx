@@ -16,7 +16,8 @@ export default function VehicleModelScreen() {
   const { draft, updateDraft } = useBookingDraftStore();
   const make = draft.vehicleMake;
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isFetching: isLoading, isError, error, refetch } = useQuery({
+    retry: false,
     queryKey: ['vehicle-models', make],
     queryFn: () => listVehicleModels(make!),
     enabled: !!make,
@@ -38,7 +39,10 @@ export default function VehicleModelScreen() {
       {isLoading ? (
         <ActivityIndicator style={styles.loader} color={colors.surfaceAccent} />
       ) : isError ? (
-        <EmptyState title="Couldn't load models" body="Check your connection and try again." />
+        <>
+          <EmptyState title="Couldn't load models" body={error?.message ?? 'Check your connection and try again.'} />
+          <AppButton label="Retry models" variant="secondary" onPress={() => { void refetch(); }} />
+        </>
       ) : data && data.length === 0 ? (
         <EmptyState title="No models available" body={`No models available for ${make}.`} />
       ) : (

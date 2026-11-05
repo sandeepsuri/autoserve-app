@@ -1,6 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
@@ -8,14 +7,13 @@ import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { BookingSummaryCard } from '@/components/BookingSummaryCard';
 import { Screen } from '@/components/Screen';
+import { SignOutButton } from '@/components/SignOutButton';
 import { colors, spacing, typography } from '@/constants/theme';
-import { signOut } from '@/lib/auth';
 import { getCurrentVendorPayoutStatus, startVendorPayoutOnboarding } from '@/lib/vendor-payouts';
 import { useVendorIdentity } from '@/lib/use-vendor-identity';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export default function VendorProfileScreen() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const { profile, session } = useAuthStore();
   const { data: shop, isLoading: shopLoading } = useVendorIdentity();
@@ -26,11 +24,6 @@ export default function VendorProfileScreen() {
     queryFn: getCurrentVendorPayoutStatus,
     enabled: Boolean(session),
   });
-
-  const handleSignOut = async () => {
-    await signOut();
-    router.replace('/(auth)');
-  };
 
   const shopName = shop?.name ?? (shopLoading ? 'Loading shop…' : 'No active shop');
   const payoutStatus = vendor?.stripeTransfersStatus ?? 'inactive';
@@ -84,7 +77,7 @@ export default function VendorProfileScreen() {
         />
       </AppCard>
 
-      <AppButton label="Sign Out" variant="secondary" onPress={handleSignOut} />
+      <SignOutButton />
     </Screen>
   );
 }

@@ -280,5 +280,4 @@ export interface DiscoveryFilters {
   mobileOnly: boolean;
   minimumRating: number;
   category: 'all' | ServiceCategory;
-  maxDistanceMiles: number;
 }
