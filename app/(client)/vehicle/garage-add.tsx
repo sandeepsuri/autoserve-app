@@ -9,6 +9,7 @@ import { AppTextField } from '@/components/AppTextField';
 import { Screen } from '@/components/Screen';
 import { SearchablePicker } from '@/components/SearchablePicker';
 import { typography } from '@/constants/theme';
+import { useBookingBack } from '@/lib/booking-navigation';
 import { listVehicleMakes, listVehicleModels, listVehicleYears } from '@/lib/vehicle-catalog';
 import { createVehicle, listVehicles } from '@/lib/vehicles';
 import { clampLength } from '@/lib/validation';
@@ -45,6 +46,10 @@ export default function GarageAddScreen() {
   const { session, guestClientId } = useAuthStore();
   const { updateDraft } = useBookingDraftStore();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const handleBookingBack = useBookingBack({
+    enabled: Boolean(returnTo),
+    back: () => router.navigate(returnTo as never),
+  });
   const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
 
   const [make, setMake] = useState('');
@@ -155,6 +160,7 @@ export default function GarageAddScreen() {
         title="Add vehicle"
         subtitle="Search for your vehicle or enter it manually if it's not in the list."
         fallbackHref={backHref as never}
+        onBack={returnTo ? handleBookingBack : undefined}
       />
 
       <View style={styles.form}>

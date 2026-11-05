@@ -30,6 +30,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
+import { promptLeaveBooking, useBookingBack } from '@/lib/booking-navigation';
 import { createBookingFromSelections } from '@/lib/bookings';
 import { ensureProfileRow } from '@/lib/auth';
 import { addDays, startOfDay, toDateKey } from '@/lib/format';
@@ -130,6 +131,10 @@ export default function BookingScheduleScreen() {
   const [confirming, setConfirming] = useState(false);
 
   const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
+
+  const handleBack = useBookingBack({
+    back: () => router.navigate('/(client)/booking/service'),
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['booking-vendor-services', draft.vendorId],
@@ -256,21 +261,22 @@ export default function BookingScheduleScreen() {
   }, [draft.scheduledDate, vendorAvailability]);
 
   // Stale slot guard: clear scheduledTime if selected slot no longer exists.
+  // Until vendor data loads, availability is empty and says nothing about the slot.
   useEffect(() => {
-    if (draft.scheduledTime && !availableTimeSlots.includes(draft.scheduledTime)) {
+    if (data && draft.scheduledTime && !availableTimeSlots.includes(draft.scheduledTime)) {
       updateDraft({ scheduledTime: undefined });
     }
-  }, [availableTimeSlots, draft.scheduledTime, updateDraft]);
+  }, [availableTimeSlots, data, draft.scheduledTime, updateDraft]);
 
   // Stale date guard: clear scheduledDate if it is now closed.
   useEffect(() => {
-    if (draft.scheduledDate) {
+    if (data && draft.scheduledDate) {
       const dateState = dateStates.find((d) => d.value === draft.scheduledDate);
       if (!dateState || !dateState.hasSlots) {
         updateDraft({ scheduledDate: undefined, scheduledTime: undefined });
       }
     }
-  }, [dateStates, draft.scheduledDate, updateDraft]);
+  }, [data, dateStates, draft.scheduledDate, updateDraft]);
 
   const selectedDateLabel =
     dateStates.find((o) => o.value === draft.scheduledDate)?.label ??
@@ -405,6 +411,7 @@ export default function BookingScheduleScreen() {
           title="2. Services, date, and time"
           subtitle="Choose the work you need, then lock in a date and one of the vendor's available time slots."
           fallbackHref="/(client)/booking/service"
+          onBack={handleBack}
         />
 
         <BookingSummaryCard
@@ -451,7 +458,10 @@ export default function BookingScheduleScreen() {
               <AppButton
                 label="Back to vendor"
                 variant="secondary"
-                onPress={() => router.back()}
+                onPress={() => {
+                  const vendorId = draft.vendorId;
+                  promptLeaveBooking(() => router.navigate(`/(client)/shop/${vendorId}`));
+                }}
               />
             </View>
           )}

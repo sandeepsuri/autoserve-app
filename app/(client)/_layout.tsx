@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
 import { colors } from '@/constants/theme';
+import { hasBookingDraft, isClientBookingRoute, promptLeaveBooking } from '@/lib/booking-navigation';
 
 export default function ClientLayout() {
   return (
@@ -11,6 +12,18 @@ export default function ClientLayout() {
         tabBarActiveTintColor: colors.surfaceAccent,
         tabBarInactiveTintColor: colors.textTertiary,
       }}
+      screenListeners={({ navigation }) => ({
+        // The tab bar stays visible during booking, so a tab press can leave the flow.
+        tabPress: (event) => {
+          const state = navigation.getState();
+          const current = state.routes[state.index];
+          if (!hasBookingDraft() || !isClientBookingRoute(current.name, current.params)) return;
+          const target = state.routes.find((route) => route.key === event.target);
+          if (!target) return;
+          event.preventDefault();
+          promptLeaveBooking(() => navigation.navigate(target.name, target.params));
+        },
+      })}
     >
       <Tabs.Screen
         name="index"

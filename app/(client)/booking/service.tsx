@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { useBookingBack } from '@/lib/booking-navigation';
 import { clampLength } from '@/lib/validation';
 import { listVehicles } from '@/lib/vehicles';
 import { getVendorDetail } from '@/lib/vendors';
@@ -38,12 +39,17 @@ export default function BookingDetailsScreen() {
   const { session, guestClientId } = useAuthStore();
   const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
 
+  const handleBack = useBookingBack({
+    back: () => router.navigate('/(client)/booking/vehicle'),
+  });
+
   // Default the mode to 'shop' until the user picks one. Keyed on draft state
-  // (not a mount-once ref) so it re-seeds after clearDraft() when this screen
-  // instance is reused for a subsequent booking.
+  // (not a mount-once ref) so it re-seeds when this screen instance is reused
+  // for a subsequent booking. Skipped without a vendor so that a cleared draft
+  // stays cleared while this tab screen remains mounted.
   useEffect(() => {
-    if (!draft.bookingMode) updateDraft({ bookingMode: 'shop' });
-  }, [draft.bookingMode, updateDraft]);
+    if (draft.vendorId && !draft.bookingMode) updateDraft({ bookingMode: 'shop' });
+  }, [draft.bookingMode, draft.vendorId, updateDraft]);
   const { data, isLoading } = useQuery({
     queryKey: ['booking-vendor-details', draft.vendorId],
     queryFn: () => getVendorDetail(draft.vendorId!),
@@ -89,6 +95,7 @@ export default function BookingDetailsScreen() {
         title="1. Booking details"
         subtitle="Confirm the vehicle, choose how the service happens, and share any issue details for the mechanic."
         fallbackHref="/(client)/booking/vehicle"
+        onBack={handleBack}
       />
 
       <BookingSummaryCard
