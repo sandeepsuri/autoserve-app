@@ -9,6 +9,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { useBookingBack } from '@/lib/booking-navigation';
 import { listVehicles } from '@/lib/vehicles';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBookingDraftStore } from '@/store/useBookingDraftStore';
@@ -27,6 +28,12 @@ export default function BookingVehicleScreen() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const vendorId = draft.vendorId;
+  const handleBack = useBookingBack({
+    exitsFlow: true,
+    back: () => router.navigate(`/(client)/shop/${vendorId}`),
+  });
+
   useEffect(() => {
     if (isLoading) return;
     if (draft.vehicleId && vehicles.some((vehicle) => vehicle.id === draft.vehicleId)) {
@@ -40,7 +47,7 @@ export default function BookingVehicleScreen() {
   if (!session && !guestMode) {
     return (
       <Screen>
-        <AppHeader title="Select vehicle" fallbackHref="/(client)" />
+        <AppHeader title="Select vehicle" fallbackHref="/(client)" onBack={vendorId ? handleBack : undefined} />
         <EmptyState
           title="Sign in to continue"
           body="You need to be signed in to select a vehicle and complete a booking."
@@ -65,7 +72,7 @@ export default function BookingVehicleScreen() {
   if (isLoading) {
     return (
       <Screen scroll={false}>
-        <AppHeader title="Select vehicle" fallbackHref="/(client)" />
+        <AppHeader title="Select vehicle" fallbackHref="/(client)" onBack={handleBack} />
         <ActivityIndicator size="large" color={colors.surfaceAccent} style={styles.loader} />
       </Screen>
     );
@@ -84,6 +91,7 @@ export default function BookingVehicleScreen() {
           title="Select vehicle"
           subtitle="You need a saved vehicle before booking."
           fallbackHref="/(client)"
+          onBack={handleBack}
         />
         <EmptyState
           title="No vehicles saved yet"
@@ -109,6 +117,7 @@ export default function BookingVehicleScreen() {
         title="Select vehicle"
         subtitle="Choose the vehicle for this booking."
         fallbackHref="/(client)"
+        onBack={handleBack}
       />
 
       {vehicles.map((vehicle) => (

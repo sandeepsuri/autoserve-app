@@ -16,6 +16,7 @@ import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ServiceCard } from '@/components/ServiceCard';
 import { colors, spacing, typography } from '@/constants/theme';
+import { promptLeaveBooking } from '@/lib/booking-navigation';
 import { getVendorDetail } from '@/lib/vendors';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBookingDraftStore } from '@/store/useBookingDraftStore';
@@ -75,7 +76,7 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
     );
   }
 
-  const handleBook = () => {
+  const startBooking = () => {
     clearDraft();
     setSubmittedGuestBooking(null);
     // Seed a default booking mode at entry so the draft always carries a valid
@@ -89,6 +90,9 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
     setGuestMode(true);
     router.push(`/(public)/guest-booking/${vendor.id}/details`);
   };
+
+  // Starting over replaces any unfinished draft, so that has to be a choice.
+  const handleBook = () => promptLeaveBooking(startBooking);
 
   return (
     <SafeAreaView style={styles.safeArea}>

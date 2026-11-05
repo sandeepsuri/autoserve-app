@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { SearchablePicker } from '@/components/SearchablePicker';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { useBookingBack } from '@/lib/booking-navigation';
 import { addDays, startOfDay, toDateKey } from '@/lib/format';
 import { guestBookingContactSchema, guestVehicleSchema, sanitizeText } from '@/lib/validation';
 import { listVehicleMakes, listVehicleModels, listVehicleYears } from '@/lib/vehicle-catalog';
@@ -30,6 +31,13 @@ export default function GuestBookingDetailsScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useBookingDraftStore();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const handleBack = useBookingBack({
+    exitsFlow: true,
+    back: () => {
+      if (router.canGoBack()) router.back();
+      else router.replace(`/(public)/shop/${vendorId}`);
+    },
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['guest-booking-vendor', vendorId],
@@ -62,20 +70,22 @@ export default function GuestBookingDetailsScreen() {
     [data?.availability, draft.scheduledDate],
   );
 
+  // Both defaults need a vendor so a cleared draft stays cleared while this
+  // screen is still mounted during the transition out.
   useEffect(() => {
-    if (dateOptions.length && (!draft.scheduledDate || !dateOptions.includes(draft.scheduledDate))) {
+    if (draft.vendorId && dateOptions.length && (!draft.scheduledDate || !dateOptions.includes(draft.scheduledDate))) {
       updateDraft({ scheduledDate: dateOptions[0], scheduledTime: undefined });
     }
-  }, [dateOptions, draft.scheduledDate, updateDraft]);
+  }, [dateOptions, draft.scheduledDate, draft.vendorId, updateDraft]);
 
   useEffect(() => {
-    if (timeOptions.length && (!draft.scheduledTime || !timeOptions.includes(draft.scheduledTime))) {
+    if (draft.vendorId && timeOptions.length && (!draft.scheduledTime || !timeOptions.includes(draft.scheduledTime))) {
       updateDraft({ scheduledTime: timeOptions[0] });
     }
-  }, [draft.scheduledTime, timeOptions, updateDraft]);
+  }, [draft.scheduledTime, draft.vendorId, timeOptions, updateDraft]);
 
-  if (isLoading) return <Screen><AppHeader title="Guest booking" fallbackHref={`/(public)/shop/${vendorId}` as never} /></Screen>;
-  if (!vendor) return <Screen><AppHeader fallbackHref="/(public)/discover" /><EmptyState title="Vendor unavailable" body="Return to discovery and choose another provider." /></Screen>;
+  if (isLoading) return <Screen><AppHeader title="Guest booking" fallbackHref={`/(public)/shop/${vendorId}` as never} onBack={handleBack} /></Screen>;
+  if (!vendor) return <Screen><AppHeader fallbackHref="/(public)/discover" onBack={handleBack} /><EmptyState title="Vendor unavailable" body="Return to discovery and choose another provider." /></Screen>;
 
   const toggleService = (serviceId: string) => {
     const next = selectedServiceIds.includes(serviceId)
@@ -105,7 +115,7 @@ export default function GuestBookingDetailsScreen() {
 
   return (
     <Screen>
-      <AppHeader title="Guest booking · Step 1 of 2" subtitle="No account or saved garage required. These details are used for this request only." fallbackHref={`/(public)/shop/${vendor.id}` as never} />
+      <AppHeader title="Guest booking · Step 1 of 2" subtitle="No account or saved garage required. These details are used for this request only." fallbackHref={`/(public)/shop/${vendor.id}` as never} onBack={handleBack} />
       <View style={styles.progress}><View style={styles.progressActive} /><View style={styles.progressIdle} /></View>
       <AppCard style={styles.vendorCard}><Text style={typography.titleSm}>{vendor.name}</Text><Text style={styles.secondary}>{vendor.address}</Text></AppCard>
 
