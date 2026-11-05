@@ -46,6 +46,8 @@ const toDbRow = (v: VendorSummary) => ({
   rating: v.rating,
   review_count: v.reviewCount,
   mobile_service_enabled: v.mobileServiceEnabled,
+  location_mode: v.locationMode,
+  booking_modes: v.bookingModes ?? (v.mobileServiceEnabled ? ['shop', 'mobile'] : ['shop']),
   service_radius_miles: v.serviceRadiusMiles,
   next_available: v.nextAvailable,
   hero_image: v.heroImage ?? null,
@@ -81,6 +83,15 @@ describe('listVendors — filtering', () => {
     const result = await listVendors({ mobileOnly: true });
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('v1');
+  });
+
+  it('mobile discovery uses current booking modes rather than the historical profile flag', async () => {
+    mockSupabaseRows([
+      makeVendor({ id: 'disabled-mobile', mobileServiceEnabled: true, bookingModes: ['shop'] }),
+      makeVendor({ id: 'mobile-only', mobileServiceEnabled: false, bookingModes: ['mobile'] }),
+      makeVendor({ id: 'neither', bookingModes: [] }),
+    ]);
+    expect((await listVendors({ mobileOnly: true })).map((v) => v.id)).toEqual(['mobile-only']);
   });
 
   it('mobileOnly: false includes all vendors regardless of mobile flag', async () => {

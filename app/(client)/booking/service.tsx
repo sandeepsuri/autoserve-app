@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { isBookableMode } from '@/lib/booking-types';
 import { clampLength } from '@/lib/validation';
 import { listVehicles } from '@/lib/vehicles';
 import { getVendorDetail } from '@/lib/vendors';
@@ -38,12 +39,6 @@ export default function BookingDetailsScreen() {
   const { session, guestClientId } = useAuthStore();
   const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
 
-  // Default the mode to 'shop' until the user picks one. Keyed on draft state
-  // (not a mount-once ref) so it re-seeds after clearDraft() when this screen
-  // instance is reused for a subsequent booking.
-  useEffect(() => {
-    if (!draft.bookingMode) updateDraft({ bookingMode: 'shop' });
-  }, [draft.bookingMode, updateDraft]);
   const { data, isLoading } = useQuery({
     queryKey: ['booking-vendor-details', draft.vendorId],
     queryFn: () => getVendorDetail(draft.vendorId!),
@@ -57,8 +52,14 @@ export default function BookingDetailsScreen() {
   });
 
   const vendor = data?.vendor;
-  const availableModes = MODE_OPTIONS.filter((option) => option.value === 'shop' || vendor?.mobileServiceEnabled);
-  const selectedMode = draft.bookingMode ?? 'shop';
+  const modes = vendor?.bookingModes ?? [];
+  const availableModes = MODE_OPTIONS.filter((option) => modes.includes(option.value));
+  const selectedMode = isBookableMode(modes, draft.bookingMode) ? draft.bookingMode : undefined;
+  useEffect(() => {
+    if (!data) return;
+    const next = isBookableMode(data.vendor?.bookingModes ?? [], draft.bookingMode) ? draft.bookingMode : undefined;
+    if (next !== draft.bookingMode) updateDraft({ bookingMode: next, scheduledDate: undefined, scheduledTime: undefined, mobileAddress: undefined });
+  }, [data, draft.bookingMode, updateDraft]);
   const selectedModeMeta = MODE_OPTIONS.find((option) => option.value === selectedMode);
 
   const savedVehicle = vehicles.find((v) => v.id === draft.vehicleId);
@@ -69,7 +70,7 @@ export default function BookingDetailsScreen() {
       : `${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model}`
     : null;
 
-  const canContinue = Boolean(vendor && hasCurrentOwnerVehicle && draft.bookingMode);
+  const canContinue = Boolean(vendor && hasCurrentOwnerVehicle && selectedMode && (selectedMode !== 'mobile' || draft.mobileAddress?.trim()));
 
   if (!draft.vendorId) {
     return (
@@ -100,7 +101,7 @@ export default function BookingDetailsScreen() {
       />
 
       <AppCard style={styles.card}>
-        <SectionHeader title="Service type" />
+        <SectionHeader title="Booking type" />
         <View style={styles.optionList}>
           {availableModes.map((option) => {
             const active = selectedMode === option.value;
@@ -110,7 +111,8 @@ export default function BookingDetailsScreen() {
                 onPress={() =>
                   updateDraft({
                     bookingMode: option.value,
-                    mobileAddress: option.value === 'mobile' ? draft.mobileAddress ?? 'Current location' : undefined,
+                    mobileAddress: option.value === 'mobile' ? draft.mobileAddress : undefined,
+                    scheduledDate: undefined, scheduledTime: undefined,
                   })
                 }
                 style={[styles.modeCard, active && styles.modeCardActive]}
@@ -125,6 +127,8 @@ export default function BookingDetailsScreen() {
           })}
         </View>
       </AppCard>
+
+      {selectedMode === 'mobile' ? <AppTextField label="Mobile service address" required maxLength={160} value={draft.mobileAddress ?? ''} onChangeText={(text) => updateDraft({ mobileAddress: clampLength(text.replace(/[<>]/g, ''), 160) })} placeholder="Enter the service address" /> : null}
 
       <AppCard style={styles.card}>
         <SectionHeader title="Describe the problem" actionLabel="Optional" />
@@ -144,13 +148,11 @@ export default function BookingDetailsScreen() {
         rows={[
           { label: 'Step 2', value: 'Pick one or more services' },
           { label: 'Then', value: 'Choose a date and available time slot' },
-          { label: 'Service type', value: selectedModeMeta?.label ?? 'Choose one above' },
+          { label: 'Booking type', value: selectedModeMeta?.label ?? 'Choose one above' },
         ]}
       />
 
-      {!vendor?.mobileServiceEnabled ? (
-        <Text style={styles.infoText}>This vendor is currently accepting shop visits only.</Text>
-      ) : null}
+      {data && !modes.length ? <EmptyState title="Bookings unavailable" body="This vendor is not currently accepting Shop Visits or Mobile Service." /> : null}
 
       {draft.vehicleId && !hasCurrentOwnerVehicle ? (
         <Text style={styles.infoText}>Choose a vehicle saved to the current account before continuing.</Text>

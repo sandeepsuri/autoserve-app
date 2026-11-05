@@ -15,7 +15,8 @@ import {
 import { AppButton } from '@/components/AppButton';
 import { FilterChip } from '@/components/FilterChip';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
-import { Service, ServiceCategory } from '@/types/domain';
+import { bookingTypesLabel } from '@/lib/booking-types';
+import { BookingMode, Service, ServiceCategory } from '@/types/domain';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -23,7 +24,7 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   vendorName: string;
-  mobileServiceEnabled?: boolean;
+  bookingModes: BookingMode[];
   services: Service[];
   onBook: () => void;
 }
@@ -36,14 +37,14 @@ function capitalize(s: string): string {
 function ServiceListCard({
   service,
   isFeatured,
-  mobileServiceEnabled,
+  bookingModes,
 }: {
   service: Service;
   isFeatured: boolean;
-  mobileServiceEnabled?: boolean;
+  bookingModes: BookingMode[];
 }) {
-  const modeLabel = mobileServiceEnabled ? 'Shop or mobile' : 'Shop visit';
-  const modeIsGreen = Boolean(mobileServiceEnabled);
+  const modeLabel = bookingTypesLabel(bookingModes);
+  const modeIsGreen = bookingModes.includes('mobile');
 
   return (
     <View style={[styles.card, isFeatured && styles.cardFeatured]}>
@@ -88,7 +89,7 @@ function ServiceListCard({
   );
 }
 
-export function AllServicesSheet({ visible, onClose, vendorName, mobileServiceEnabled, services, onBook }: Props) {
+export function AllServicesSheet({ visible, onClose, vendorName, bookingModes, services, onBook }: Props) {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<'all' | ServiceCategory>('all');
 
@@ -223,7 +224,7 @@ export function AllServicesSheet({ visible, onClose, vendorName, mobileServiceEn
               <ServiceListCard
                 service={item}
                 isFeatured={index === 0}
-                mobileServiceEnabled={mobileServiceEnabled}
+                bookingModes={bookingModes}
               />
             )}
             ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
@@ -238,7 +239,8 @@ export function AllServicesSheet({ visible, onClose, vendorName, mobileServiceEn
               style={styles.footerButton}
             />
             <AppButton
-              label="Book Appointment"
+              label={bookingModes.length ? "Book Appointment" : "Bookings unavailable"}
+              disabled={!bookingModes.length}
               variant="accent"
               onPress={onBook}
               style={styles.footerButton}

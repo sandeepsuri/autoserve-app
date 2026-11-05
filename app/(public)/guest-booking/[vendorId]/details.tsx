@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { SearchablePicker } from '@/components/SearchablePicker';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { BOOKING_TYPE_LABELS, isBookableMode } from '@/lib/booking-types';
 import { addDays, startOfDay, toDateKey } from '@/lib/format';
 import { guestBookingContactSchema, guestVehicleSchema, sanitizeText } from '@/lib/validation';
 import { listVehicleMakes, listVehicleModels, listVehicleYears } from '@/lib/vehicle-catalog';
@@ -51,15 +52,21 @@ export default function GuestBookingDetailsScreen() {
   const vendor = data?.vendor;
   const services = data?.services ?? [];
   const selectedServiceIds = draft.serviceIds ?? [];
-  const mode = draft.bookingMode ?? 'shop';
+  const modes = vendor?.bookingModes ?? [];
+  const mode = isBookableMode(modes, draft.bookingMode) ? draft.bookingMode : undefined;
+  useEffect(() => {
+    if (data && draft.bookingMode && !isBookableMode(data.vendor?.bookingModes ?? [], draft.bookingMode)) {
+      updateDraft({ bookingMode: undefined, scheduledDate: undefined, scheduledTime: undefined, mobileAddress: undefined });
+    }
+  }, [data, draft.bookingMode, updateDraft]);
   const dateOptions = useMemo(() => {
-    if (!data?.availability) return [];
+    if (!data?.availability || !mode) return [];
     return Array.from({ length: DATE_WINDOW }, (_, index) => toDateKey(addDays(startOfDay(new Date()), index + 1)))
       .filter((date) => deriveAvailableSlots(date, data.availability).length > 0);
-  }, [data?.availability]);
+  }, [data?.availability, mode]);
   const timeOptions = useMemo(
-    () => draft.scheduledDate && data?.availability ? deriveAvailableSlots(draft.scheduledDate, data.availability) : [],
-    [data?.availability, draft.scheduledDate],
+    () => mode && draft.scheduledDate && data?.availability ? deriveAvailableSlots(draft.scheduledDate, data.availability) : [],
+    [data?.availability, draft.scheduledDate, mode],
   );
 
   useEffect(() => {
@@ -77,6 +84,8 @@ export default function GuestBookingDetailsScreen() {
   if (isLoading) return <Screen><AppHeader title="Guest booking" fallbackHref={`/(public)/shop/${vendorId}` as never} /></Screen>;
   if (!vendor) return <Screen><AppHeader fallbackHref="/(public)/discover" /><EmptyState title="Vendor unavailable" body="Return to discovery and choose another provider." /></Screen>;
 
+  if (!modes.length) return <Screen><AppHeader fallbackHref={`/(public)/shop/${vendorId}` as never} /><EmptyState title="Bookings unavailable" body="This vendor is not currently accepting Shop Visits or Mobile Service." /></Screen>;
+
   const toggleService = (serviceId: string) => {
     const next = selectedServiceIds.includes(serviceId)
       ? selectedServiceIds.filter((id) => id !== serviceId)
@@ -93,6 +102,7 @@ export default function GuestBookingDetailsScreen() {
       trim: draft.vehicleTrim || undefined, color: draft.vehicleColor || undefined, plate: draft.vehiclePlate || undefined,
     });
     if (!vehicle.success) vehicle.error.issues.forEach((issue) => { nextErrors[String(issue.path[0])] = issue.message; });
+    if (!mode) nextErrors.bookingMode = 'Choose a currently available booking type.';
     if (!selectedServiceIds.length) nextErrors.services = 'Choose at least one service.';
     if (!draft.scheduledDate || !draft.scheduledTime) nextErrors.schedule = 'Choose an available date and time.';
     if (mode === 'mobile' && !draft.mobileAddress?.trim()) nextErrors.mobileAddress = 'Enter the mobile service address.';
@@ -126,15 +136,15 @@ export default function GuestBookingDetailsScreen() {
       </AppCard>
 
       <AppCard style={styles.section}>
-        <Text style={typography.titleSm}>Service and visit type</Text>
+        <Text style={typography.titleSm}>Services and booking type</Text>
         {services.map((service) => {
           const active = selectedServiceIds.includes(service.id);
           return <Pressable key={service.id} onPress={() => toggleService(service.id)} style={[styles.option, active && styles.optionActive]}><View style={styles.flex}><Text style={typography.labelLg}>{service.title}</Text><Text style={styles.secondary}>{service.durationMinutes} min</Text></View><Text style={styles.price}>${service.price.toFixed(2)}</Text></Pressable>;
         })}
         {errors.services ? <Text style={styles.error}>{errors.services}</Text> : null}
         <View style={styles.twoColumn}>
-          <ModeOption label="Shop visit" active={mode === 'shop'} onPress={() => updateDraft({ bookingMode: 'shop', mobileAddress: undefined })} />
-          {vendor.mobileServiceEnabled ? <ModeOption label="Mobile service" active={mode === 'mobile'} onPress={() => updateDraft({ bookingMode: 'mobile' })} /> : null}
+          {modes.map((option) => <ModeOption key={option} label={BOOKING_TYPE_LABELS[option]} active={mode === option} onPress={() => updateDraft({ bookingMode: option, scheduledDate: undefined, scheduledTime: undefined, mobileAddress: undefined })} />)}
+          {errors.bookingMode ? <Text style={styles.error}>{errors.bookingMode}</Text> : null}
         </View>
         {mode === 'mobile' ? <AppTextField label="Service address" required value={draft.mobileAddress ?? ''} errorText={errors.mobileAddress} onChangeText={(text) => updateDraft({ mobileAddress: sanitizeText(text, 160) })} /> : null}
       </AppCard>

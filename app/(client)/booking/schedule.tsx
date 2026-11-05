@@ -30,6 +30,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
+import { isBookableMode } from '@/lib/booking-types';
 import { createBookingFromSelections } from '@/lib/bookings';
 import { ensureProfileRow } from '@/lib/auth';
 import { addDays, startOfDay, toDateKey } from '@/lib/format';
@@ -144,6 +145,12 @@ export default function BookingScheduleScreen() {
   });
 
   const vendor = data?.vendor;
+  const modeAvailable = isBookableMode(vendor?.bookingModes ?? [], draft.bookingMode);
+  useEffect(() => {
+    if (data && draft.bookingMode && !isBookableMode(data.vendor?.bookingModes ?? [], draft.bookingMode)) {
+      updateDraft({ bookingMode: undefined, scheduledDate: undefined, scheduledTime: undefined, mobileAddress: undefined });
+    }
+  }, [data, draft.bookingMode, updateDraft]);
   const services = data?.services ?? [];
 
   // Use server-loaded availability only; an unconfigured vendor yields an empty
@@ -189,7 +196,7 @@ export default function BookingScheduleScreen() {
   const dateStates = useMemo(() => {
     return allDateOptions.map((opt) => {
       const fullyBooked = isDateFullyBooked(opt.value, vendorAvailability);
-      const slots = deriveAvailableSlots(opt.value, vendorAvailability);
+      const slots = modeAvailable ? deriveAvailableSlots(opt.value, vendorAvailability) : [];
       const maxPossibleSlots = deriveAvailableSlots(opt.value, {
         ...vendorAvailability,
         capacityPerSlot: 999,
@@ -207,7 +214,7 @@ export default function BookingScheduleScreen() {
         hasSlots: slots.length > 0,
       };
     });
-  }, [allDateOptions, vendorAvailability]);
+  }, [allDateOptions, vendorAvailability, modeAvailable]);
 
   // Next available date (for "next available" CTA)
   const nextAvailableDate = dateStates.find((d) => d.hasSlots);
@@ -251,9 +258,9 @@ export default function BookingScheduleScreen() {
 
   // Available time slots for selected date
   const availableTimeSlots = useMemo(() => {
-    if (!draft.scheduledDate) return [];
+    if (!draft.scheduledDate || !modeAvailable) return [];
     return deriveAvailableSlots(draft.scheduledDate, vendorAvailability);
-  }, [draft.scheduledDate, vendorAvailability]);
+  }, [draft.scheduledDate, vendorAvailability, modeAvailable]);
 
   // Stale slot guard: clear scheduledTime if selected slot no longer exists.
   useEffect(() => {
@@ -284,7 +291,8 @@ export default function BookingScheduleScreen() {
   const canConfirm = Boolean(
     draft.vendorId &&
       hasSelectedVehicle &&
-      draft.bookingMode &&
+      modeAvailable &&
+      (draft.bookingMode !== 'mobile' || draft.mobileAddress?.trim()) &&
       selectedServiceIds.length &&
       draft.scheduledDate &&
       draft.scheduledTime,
@@ -394,6 +402,10 @@ export default function BookingScheduleScreen() {
     );
   }
 
+  if (data && !modeAvailable) {
+    return <Screen><AppHeader fallbackHref="/(client)/booking/service" /><EmptyState title={vendor?.bookingModes?.length ? 'Choose a booking type' : 'Bookings unavailable'} body="Return to booking details to review this vendor's currently accepted booking types." /><AppButton label="Return to booking details" onPress={() => router.replace('/(client)/booking/service')} /></Screen>;
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -413,8 +425,8 @@ export default function BookingScheduleScreen() {
             { label: 'Vendor', value: vendor?.name ?? (isLoading ? 'Loading...' : 'Selected vendor') },
             { label: 'Vehicle', value: vehicleLabel ?? 'Vehicle required' },
             {
-              label: 'Service type',
-              value: draft.bookingMode === 'mobile' ? 'Mobile Service' : 'Shop Visit',
+              label: 'Booking type',
+              value: modeAvailable ? (draft.bookingMode === 'mobile' ? 'Mobile Service' : 'Shop Visit') : 'Choose an available booking type',
             },
             {
               label: 'Problem',
