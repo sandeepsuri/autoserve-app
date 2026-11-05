@@ -36,13 +36,19 @@ export default function GuestBookingDetailsScreen() {
     queryFn: () => getVendorDetail(vendorId),
     enabled: Boolean(vendorId),
   });
-  const { data: makes = [], isLoading: makesLoading } = useQuery({ queryKey: ['vehicle-makes'], queryFn: listVehicleMakes });
-  const { data: models = [], isLoading: modelsLoading } = useQuery({
+  const { data: makes = [], isFetching: makesLoading, error: makesError, refetch: retryMakes } = useQuery({
+    retry: false,
+    queryKey: ['vehicle-makes'],
+    queryFn: listVehicleMakes,
+  });
+  const { data: models = [], isFetching: modelsLoading, error: modelsError, refetch: retryModels } = useQuery({
+    retry: false,
     queryKey: ['vehicle-models', draft.vehicleMake],
     queryFn: () => listVehicleModels(draft.vehicleMake!),
     enabled: Boolean(draft.vehicleMake),
   });
-  const { data: years = [], isLoading: yearsLoading } = useQuery({
+  const { data: years = [], isFetching: yearsLoading, error: yearsError, refetch: retryYears } = useQuery({
+    retry: false,
     queryKey: ['vehicle-years', draft.vehicleMake, draft.vehicleModel],
     queryFn: () => listVehicleYears(draft.vehicleMake!, draft.vehicleModel!),
     enabled: Boolean(draft.vehicleMake && draft.vehicleModel),
@@ -118,9 +124,9 @@ export default function GuestBookingDetailsScreen() {
 
       <AppCard style={styles.section}>
         <Text style={typography.titleSm}>Vehicle details</Text><Text style={styles.secondary}>This vehicle will not be saved to a profile or garage.</Text>
-        <SearchablePicker label="Make" required value={draft.vehicleMake ?? ''} options={makes} isLoading={makesLoading} errorText={errors.make} placeholder="Search or enter make" onChange={(value) => updateDraft({ vehicleMake: value, vehicleModel: undefined, vehicleYear: undefined })} />
-        <SearchablePicker label="Model" required value={draft.vehicleModel ?? ''} options={models} isLoading={modelsLoading} errorText={errors.model} placeholder="Search or enter model" disabled={!draft.vehicleMake} disabledHelperText="Choose a make first" onChange={(value) => updateDraft({ vehicleModel: value, vehicleYear: undefined })} />
-        <SearchablePicker label="Year" required value={draft.vehicleYear ?? ''} options={years} isLoading={yearsLoading} errorText={errors.year} placeholder="Search or enter year" disabled={!draft.vehicleModel} disabledHelperText="Choose a model first" onChange={(value) => updateDraft({ vehicleYear: value })} />
+        <SearchablePicker label="Make" required value={draft.vehicleMake ?? ''} options={makes} isLoading={makesLoading} loadError={makesError?.message} onRetry={() => { void retryMakes(); }} errorText={errors.make} placeholder="Search or enter make" onChange={(value) => updateDraft({ vehicleMake: value, vehicleModel: undefined, vehicleYear: undefined })} />
+        <SearchablePicker label="Model" required value={draft.vehicleModel ?? ''} options={models} isLoading={modelsLoading} loadError={modelsError?.message} onRetry={() => { void retryModels(); }} errorText={errors.model} placeholder="Search or enter model" disabled={!draft.vehicleMake} disabledHelperText="Choose a make first" onChange={(value) => updateDraft({ vehicleModel: value, vehicleYear: undefined })} />
+        <SearchablePicker label="Year" required value={draft.vehicleYear ?? ''} options={years} isLoading={yearsLoading} loadError={yearsError?.message} onRetry={() => { void retryYears(); }} errorText={errors.year} placeholder="Search or enter year" disabled={!draft.vehicleModel} disabledHelperText="Choose a model first" onChange={(value) => updateDraft({ vehicleYear: value })} />
         <AppTextField label="Trim" value={draft.vehicleTrim ?? ''} onChangeText={(text) => updateDraft({ vehicleTrim: sanitizeText(text, 60) })} placeholder="Optional" />
         <View style={styles.twoColumn}><View style={styles.flex}><AppTextField label="Colour" value={draft.vehicleColor ?? ''} onChangeText={(text) => updateDraft({ vehicleColor: sanitizeText(text, 30) })} placeholder="Optional" /></View><View style={styles.flex}><AppTextField label="License plate" value={draft.vehiclePlate ?? ''} onChangeText={(text) => updateDraft({ vehiclePlate: text.replace(/[<>]/g, '').slice(0, 12).toUpperCase() })} placeholder="Optional" autoCapitalize="characters" /></View></View>
       </AppCard>
