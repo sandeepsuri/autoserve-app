@@ -7,6 +7,7 @@ import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
 import { AppTextField } from '@/components/AppTextField';
+import { BookingSelectionSummary } from '@/components/BookingSelectionSummary';
 import { BookingSummaryCard } from '@/components/BookingSummaryCard';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
@@ -15,6 +16,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import { isBookableMode } from '@/lib/booking-types';
 import { useBookingBack } from '@/lib/booking-navigation';
+import { formatVehicleLabel } from '@/lib/booking-summary';
 import { useBookingServiceReconciliation } from '@/lib/use-booking-service-reconciliation';
 import { clampLength } from '@/lib/validation';
 import { listVehicles } from '@/lib/vehicles';
@@ -72,11 +74,8 @@ export default function BookingDetailsScreen() {
 
   const savedVehicle = vehicles.find((v) => v.id === draft.vehicleId);
   const hasCurrentOwnerVehicle = Boolean(savedVehicle);
-  const vehicleLabel = savedVehicle
-    ? savedVehicle.nickname
-      ? `${savedVehicle.nickname} (${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model})`
-      : `${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model}`
-    : null;
+  const vehicleLabel = savedVehicle ? formatVehicleLabel(savedVehicle) : null;
+  const selectedServices = (data?.services ?? []).filter((service) => draft.serviceIds?.includes(service.id));
 
   const canContinue = Boolean(vendor && hasCurrentOwnerVehicle && selectedMode && (selectedMode !== 'mobile' || draft.mobileAddress?.trim()));
 
@@ -101,12 +100,11 @@ export default function BookingDetailsScreen() {
         onBack={handleBack}
       />
 
-      <BookingSummaryCard
-        title="Selected vehicle"
-        rows={[
-          { label: 'Vendor', value: vendor?.name ?? (isLoading ? 'Loading…' : 'Selected vendor') },
-          { label: 'Vehicle', value: vehicleLabel ?? 'Complete the vehicle step first' },
-        ]}
+      <BookingSelectionSummary
+        title="Your booking"
+        vendorName={vendor?.name ?? (isLoading ? 'Loading…' : 'Selected vendor')}
+        vehicleLabel={vehicleLabel ?? 'Complete the vehicle step first'}
+        services={selectedServices}
       />
 
       <AppCard style={styles.card}>

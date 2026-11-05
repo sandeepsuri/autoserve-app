@@ -18,14 +18,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
-import { BookingSummaryCard } from '@/components/BookingSummaryCard';
+import { BookingConfirmationModal } from '@/components/BookingConfirmationModal';
+import { BookingSelectionSummary } from '@/components/BookingSelectionSummary';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { ServiceRemovalNotice } from '@/components/ServiceRemovalNotice';
@@ -33,6 +34,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { getServiceEligibility, ineligibleReason, isBookableMode, isServiceEligible, SERVICE_ELIGIBILITY_LABELS } from '@/lib/booking-types';
 import { promptLeaveBooking, useBookingBack } from '@/lib/booking-navigation';
+import { calculateBookingPrice, formatPrice, formatVehicleLabel } from '@/lib/booking-summary';
 import { createBookingFromSelections } from '@/lib/bookings';
 import { ensureProfileRow } from '@/lib/auth';
 import { addDays, startOfDay, toDateKey } from '@/lib/format';
@@ -131,7 +133,10 @@ export default function BookingScheduleScreen() {
   const insets = useSafeAreaInsets();
   const { draft, clearDraft, updateDraft } = useBookingDraftStore();
   const { session, profile, guestMode, guestClientId, setPostAuthPath } = useAuthStore();
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // State only updates on the next render, so a second tap could still pass a state check.
+  const submitLock = useRef(false);
 
   const vehicleOwnerKey = session?.userId ?? guestClientId ?? 'anonymous';
 
@@ -145,11 +150,13 @@ export default function BookingScheduleScreen() {
     enabled: Boolean(draft.vendorId),
   });
 
-  const { data: vehicles = [] } = useQuery({
+  const { data: loadedVehicles } = useQuery({
     queryKey: ['client-vehicles', vehicleOwnerKey],
     queryFn: listVehicles,
     enabled: Boolean(draft.vehicleId),
   });
+  const vehicles = loadedVehicles ?? [];
+  const vehiclesLoaded = Boolean(loadedVehicles);
 
   const vendor = data?.vendor;
   const modeAvailable = isBookableMode(vendor?.bookingModes ?? [], draft.bookingMode);
@@ -168,9 +175,7 @@ export default function BookingScheduleScreen() {
   const selectedServices = services.filter((service) =>
     selectedServiceIds.includes(service.id),
   );
-  const subtotal = selectedServices.reduce((sum, s) => sum + s.price, 0);
-  const serviceFee = Math.round(subtotal * 0.12 * 100) / 100;
-  const total = Math.round((subtotal + serviceFee) * 100) / 100;
+  const { total } = calculateBookingPrice(selectedServices);
 
   // In-app payment is only offered when the vendor has active Stripe
   // transfers; otherwise the client pays the vendor directly at the shop.
@@ -185,11 +190,8 @@ export default function BookingScheduleScreen() {
   );
 
   const savedVehicle = vehicles.find((v) => v.id === draft.vehicleId);
-  const hasSelectedVehicle = Boolean(draft.vehicleId);
   const vehicleLabel = savedVehicle
-    ? savedVehicle.nickname
-      ? `${savedVehicle.nickname} (${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model})`
-      : `${savedVehicle.year} ${savedVehicle.make} ${savedVehicle.model}`
+    ? formatVehicleLabel(savedVehicle)
     : draft.vehicleId
       ? 'Selected vehicle'
       : null;
@@ -299,7 +301,7 @@ export default function BookingScheduleScreen() {
 
   const canConfirm = Boolean(
     draft.vendorId &&
-      hasSelectedVehicle &&
+      savedVehicle &&
       modeAvailable &&
       (draft.bookingMode !== 'mobile' || draft.mobileAddress?.trim()) &&
       selectedServices.length &&
@@ -307,6 +309,11 @@ export default function BookingScheduleScreen() {
       draft.scheduledDate &&
       draft.scheduledTime,
   );
+
+  // A refresh can invalidate what the modal shows; the schedule explains what changed.
+  useEffect(() => {
+    if (reviewOpen && !canConfirm && !confirming) setReviewOpen(false);
+  }, [canConfirm, confirming, reviewOpen]);
 
   const toggleService = (serviceId: string) => {
     const next = selectedServiceIds.includes(serviceId)
@@ -320,33 +327,63 @@ export default function BookingScheduleScreen() {
     updateDraft({ scheduledDate: dateState.value, scheduledTime: undefined });
   };
 
+  const goToSignIn = () => {
+    setPostAuthPath('/(client)/booking/vehicle');
+    router.push('/(auth)');
+  };
+
+  const openReview = () => {
+    if (!canConfirm) return;
+    if (session) setReviewOpen(true);
+    else goToSignIn();
+  };
+
+  /** Runs after the booking exists, so any failure must cancel it or a retry would duplicate it. */
+  const collectPayment = async (bookingId: string) => {
+    try {
+      const payment = await createBookingPayment(bookingId);
+      // When the vendor hasn't completed payout setup, payment is skipped and
+      // the booking proceeds unpaid.
+      if (!payment.paymentRequired || !payment.clientSecret) return;
+
+      const initResult = await initPaymentSheet({
+        merchantDisplayName: 'AutoServe',
+        paymentIntentClientSecret: payment.clientSecret,
+        returnURL: 'autoserve://stripe-redirect',
+      });
+      if (initResult.error) throw new Error(initResult.error.message);
+
+      const paymentResult = await presentPaymentSheet();
+      if (paymentResult.error) throw new Error(paymentResult.error.message);
+    } catch (err) {
+      await cancelUnpaidBookingAfterPaymentFailure(bookingId);
+      throw err;
+    }
+  };
+
   const confirmBooking = async () => {
-    if (!canConfirm || confirming) return;
+    if (submitLock.current || !canConfirm || !savedVehicle) return;
 
     if (!session) {
-      setPostAuthPath('/(client)/booking/vehicle');
-      router.push('/(auth)');
+      setReviewOpen(false);
+      goToSignIn();
       return;
     }
 
-    if (!vendor || !selectedServices.length) {
+    if (!vendor) {
       Alert.alert('Vendor data unavailable', 'Please go back and try again.');
       return;
     }
 
-    await ensureProfileRow();
+    submitLock.current = true;
     setConfirming(true);
 
     try {
-      const vehicleId = draft.vehicleId;
-      if (!vehicleId) {
-        Alert.alert('Vehicle required', 'Please go back and select a vehicle before confirming.');
-        return;
-      }
+      await ensureProfileRow();
 
       const booking = await createBookingFromSelections({
         vendor: { id: vendor.id, name: vendor.name },
-        vehicle: { id: vehicleId },
+        vehicle: { id: savedVehicle.id },
         services: selectedServices,
         scheduledDate: draft.scheduledDate!,
         scheduledTime: draft.scheduledTime!,
@@ -359,46 +396,27 @@ export default function BookingScheduleScreen() {
       });
 
       if (isSupabaseConfigured && paymentMethod === 'online') {
-        const payment = await createBookingPayment(booking.id);
-        // When the vendor hasn't completed payout setup, payment is skipped and
-        // the booking proceeds unpaid.
-        if (payment.paymentRequired && payment.clientSecret) {
-          const initResult = await initPaymentSheet({
-            merchantDisplayName: 'AutoServe',
-            paymentIntentClientSecret: payment.clientSecret,
-            returnURL: 'autoserve://stripe-redirect',
-          });
-
-          if (initResult.error) {
-            await cancelUnpaidBookingAfterPaymentFailure(booking.id);
-            throw new Error(initResult.error.message);
-          }
-
-          const paymentResult = await presentPaymentSheet();
-          if (paymentResult.error) {
-            await cancelUnpaidBookingAfterPaymentFailure(booking.id);
-            throw new Error(paymentResult.error.message);
-          }
-        }
+        await collectPayment(booking.id);
       }
 
-      clearDraft();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['client-bookings'] }),
-        queryClient.invalidateQueries({ queryKey: ['vendor-bookings'] }),
-        queryClient.invalidateQueries({ queryKey: ['vendor-bookings-status'] }),
-      ]);
+      // The booking exists from here on, so nothing below may report a failure.
+      void queryClient.invalidateQueries({ queryKey: ['client-bookings'] });
+      void queryClient.invalidateQueries({ queryKey: ['vendor-bookings'] });
+      void queryClient.invalidateQueries({ queryKey: ['vendor-bookings-status'] });
 
+      setReviewOpen(false);
       router.replace({
         pathname: '/(client)/confirmation',
         params: { bookingId: booking.id },
       });
+      clearDraft();
     } catch (err) {
       Alert.alert('Booking failed', err instanceof Error ? err.message : String(err));
       // The vendor may have changed since this screen loaded; show what is bookable now.
       void queryClient.invalidateQueries({ queryKey: ['booking-vendor-services', draft.vendorId] });
       void queryClient.invalidateQueries({ queryKey: ['booking-vendor-details', draft.vendorId] });
     } finally {
+      submitLock.current = false;
       setConfirming(false);
     }
   };
@@ -433,11 +451,12 @@ export default function BookingScheduleScreen() {
           onBack={handleBack}
         />
 
-        <BookingSummaryCard
+        <BookingSelectionSummary
           title="Booking request"
-          rows={[
-            { label: 'Vendor', value: vendor?.name ?? (isLoading ? 'Loading...' : 'Selected vendor') },
-            { label: 'Vehicle', value: vehicleLabel ?? 'Vehicle required' },
+          vendorName={vendor?.name ?? (isLoading ? 'Loading...' : 'Selected vendor')}
+          vehicleLabel={vehicleLabel ?? 'Vehicle required'}
+          services={selectedServices}
+          extraRows={[
             {
               label: 'Booking type',
               value: modeAvailable ? (draft.bookingMode === 'mobile' ? 'Mobile Service' : 'Shop Visit') : 'Choose an available booking type',
@@ -673,6 +692,12 @@ export default function BookingScheduleScreen() {
           </Text>
         ) : null}
 
+        {vehiclesLoaded && !savedVehicle ? (
+          <Text style={styles.validationText}>
+            Go back and choose a vehicle saved to this account before confirming.
+          </Text>
+        ) : null}
+
         {!session && guestMode ? (
           <Text style={styles.validationText}>
             Sign in before confirming so the booking is saved to your account.
@@ -684,7 +709,7 @@ export default function BookingScheduleScreen() {
         <View style={styles.estimateRow}>
           <View style={styles.estimateBlock}>
             <Text style={styles.estimateLabel}>Total estimate</Text>
-            <Text style={styles.estimateValue}>${total.toFixed(2)}</Text>
+            <Text style={styles.estimateValue}>{formatPrice(total)}</Text>
           </View>
           <View style={[styles.estimateBlock, styles.estimateBlockRight]}>
             <Text style={styles.estimateLabel}>
@@ -696,12 +721,27 @@ export default function BookingScheduleScreen() {
           </View>
         </View>
         <AppButton
-          label={confirming ? 'Confirming...' : session ? 'Book Appointment' : 'Sign In to Confirm'}
+          label={session ? 'Review Booking' : 'Sign In to Confirm'}
           variant="accent"
-          disabled={!canConfirm || confirming}
-          onPress={confirmBooking}
+          disabled={!canConfirm}
+          onPress={openReview}
         />
       </View>
+
+      <BookingConfirmationModal
+        visible={reviewOpen}
+        submitting={confirming}
+        vendorName={vendor?.name ?? ''}
+        vehicleLabel={vehicleLabel ?? ''}
+        bookingTypeLabel={draft.bookingMode === 'mobile' ? 'Mobile Service' : 'Shop Visit'}
+        services={selectedServices}
+        dateLabel={draft.scheduledDate ? formatFullDate(draft.scheduledDate) : ''}
+        timeLabel={draft.scheduledTime ? formatTimeDisplay(draft.scheduledTime) : ''}
+        location={(draft.bookingMode === 'mobile' ? draft.mobileAddress : vendor?.address) ?? ''}
+        paymentLabel={paymentMethod === 'online' ? 'Pay online now' : 'Pay at the shop'}
+        onCancel={() => setReviewOpen(false)}
+        onConfirm={confirmBooking}
+      />
     </SafeAreaView>
   );
 }

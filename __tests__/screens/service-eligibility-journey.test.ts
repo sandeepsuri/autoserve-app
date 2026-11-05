@@ -165,7 +165,7 @@ describe('changing booking type', () => {
     configure('mobile', ['align']);
     const tree = render(ClientSchedule);
     expect(draft().serviceIds).toEqual([]);
-    const book = tree.root.findAllByType(AppButton).find((node: any) => node.props.label === 'Book Appointment');
+    const book = tree.root.findAllByType(AppButton).find((node: any) => node.props.label === 'Review Booking');
     expect(book.props.disabled).toBe(true);
     act(() => tree.unmount());
   });
@@ -200,9 +200,10 @@ describe('server rejection', () => {
     (createBookingFromSelections as jest.Mock).mockRejectedValue(rejection);
     configure('mobile', ['oil']);
     const tree = render(ClientSchedule);
-    const book = tree.root.findAllByType(AppButton).find((node: any) => node.props.label === 'Book Appointment');
-    expect(book.props.disabled).toBe(false);
-    await act(async () => { await book.props.onPress(); });
+    const button = (label: string) => tree.root.findAllByType(AppButton).find((node: any) => node.props.label === label);
+    expect(button('Review Booking').props.disabled).toBe(false);
+    act(() => button('Review Booking').props.onPress());
+    await act(async () => { await button('Confirm').props.onPress(); });
     expect(Alert.alert).toHaveBeenCalledWith('Booking failed', rejection.message);
     expect(draft().serviceIds).toEqual(['oil']);
     expect(mockInvalidate).toHaveBeenCalledWith({ queryKey: ['booking-vendor-services', 'vendor-22'] });

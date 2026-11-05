@@ -12,6 +12,7 @@ import { Screen } from '@/components/Screen';
 import { SearchablePicker } from '@/components/SearchablePicker';
 import { ServiceRemovalNotice } from '@/components/ServiceRemovalNotice';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { calculateBookingPrice } from '@/lib/booking-summary';
 import { BOOKING_TYPE_LABELS, ineligibleReason, isBookableMode } from '@/lib/booking-types';
 import { useBookingBack } from '@/lib/booking-navigation';
 import { addDays, startOfDay, toDateKey } from '@/lib/format';
@@ -129,8 +130,7 @@ export default function GuestBookingDetailsScreen() {
     if (!Object.keys(nextErrors).length) router.push(`/(public)/guest-booking/${vendorId}/review`);
   };
 
-  const subtotal = services.filter((service) => selectedServiceIds.includes(service.id)).reduce((sum, service) => sum + service.price, 0);
-  const total = subtotal * 1.12;
+  const { total } = calculateBookingPrice(services.filter((service) => selectedServiceIds.includes(service.id)));
 
   return (
     <Screen>
