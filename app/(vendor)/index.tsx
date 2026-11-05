@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
@@ -10,6 +12,7 @@ import { colors, radius, shadows, spacing, typography } from '@/constants/theme'
 import { STATUS_COLORS, STATUS_LABEL } from '@/lib/booking-status';
 import { listBookingsForVendorOwner } from '@/lib/bookings';
 import { formatScheduledEST } from '@/lib/format';
+import { useVendorIdentity } from '@/lib/use-vendor-identity';
 import { useAuthStore } from '@/store/useAuthStore';
 import { BookingRecord } from '@/types/domain';
 
@@ -58,6 +61,8 @@ function serviceSummary(booking: BookingRecord) {
 }
 
 export default function VendorDashboardScreen() {
+  const router = useRouter();
+  const { data: vendor, isLoading: vendorLoading } = useVendorIdentity();
   const userId = useAuthStore((s) => s.session?.userId ?? 'anon');
   const { data: bookings = [], isLoading, error } = useQuery({
     queryKey: ['vendor-bookings', 'vendor', userId],
@@ -73,6 +78,7 @@ export default function VendorDashboardScreen() {
   return (
     <Screen>
       <Text style={typography.titleLg}>Vendor dashboard</Text>
+      <Text style={styles.shopName}>{vendor?.name ?? (vendorLoading ? 'Loading shop…' : 'No active shop')}</Text>
       <Text style={styles.subtitle}>Monitor upcoming work, earnings, and customer activity from one operational hub.</Text>
 
       <View style={styles.row}>
@@ -141,6 +147,7 @@ export default function VendorDashboardScreen() {
       <AppCard>
         <Text style={typography.titleSm}>Manage services</Text>
         <Text style={styles.subtitle}>Update pricing, durations, and mobile-service availability to stay accurate in discovery.</Text>
+        <AppButton label="Edit Services" variant="secondary" onPress={() => router.push('/(vendor)/services')} style={styles.editServices} />
       </AppCard>
 
       {error ? (
@@ -169,6 +176,16 @@ export default function VendorDashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  shopName: {
+    ...typography.titleSm,
+    lineHeight: 26,
+    paddingBottom: 2,
+  },
+  editServices: {
+    alignSelf: 'stretch',
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+  },
   subtitle: {
     ...typography.bodyMd,
     color: colors.textSecondary,

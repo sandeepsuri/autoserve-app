@@ -43,6 +43,7 @@ export default function VendorLayout() {
 
   return (
     <Tabs
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.surfaceAccent,
