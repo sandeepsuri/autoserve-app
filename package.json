@@ -11,7 +11,7 @@
     "build:ios:preview": "npx eas-cli build --profile preview --platform ios",
     "build:preview": "npx eas-cli build --profile preview --platform all",
     "lint": "expo lint",
-    "test": "jest"
+    "test": "NODE_ENV=test jest"
   },
   "dependencies": {
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
