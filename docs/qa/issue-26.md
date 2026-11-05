@@ -4,7 +4,7 @@ Integration target: `fix/ui-issues`. Do not merge into the default branch.
 
 ## Preview setup
 
-Apply `supabase/migrations/20261105000000_preserve_service_catalogue_order.sql`
+Apply `supabase/migrations/20261105000001_preserve_service_catalogue_order.sql`
 to the preview database before running the new app. The migration establishes a
 deterministic baseline ordered by vendor ID and service ID because old rows have
 no ordering metadata. New services append using a database sequence; title,
