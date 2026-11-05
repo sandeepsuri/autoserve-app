@@ -7,6 +7,7 @@ import { Service } from '@/types/domain';
 
 // jest-expo provides the renderer; keep this test independent of additional test libraries.
 type TestNode = {
+  type: unknown;
   props: Record<string, unknown>;
   findByType: (type: unknown) => TestNode;
   findAllByType: (type: unknown) => TestNode[];
@@ -25,8 +26,8 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 const services: Service[] = [
-  { id: 'oil', vendorId: 'shop', title: 'Oil change', category: 'oil', price: 70, durationMinutes: 30, active: true },
-  { id: 'tires', vendorId: 'shop', title: 'Tire rotation', category: 'tire', price: 40, durationMinutes: 20, active: true },
+  { id: 'oil', vendorId: 'shop', title: 'Oil change', category: 'oil', price: 70, durationMinutes: 30, active: true, bookingEligibility: 'shop' },
+  { id: 'tires', vendorId: 'shop', title: 'Tire rotation', category: 'tire', price: 40, durationMinutes: 20, active: true, bookingEligibility: 'both' },
 ];
 
 describe('AllServicesSheet search', () => {
@@ -75,5 +76,30 @@ describe('AllServicesSheet search', () => {
     await search('');
     expect(clearButtons()).toHaveLength(0);
     await act(() => { renderer!.unmount(); });
+  });
+});
+
+describe('AllServicesSheet service eligibility', () => {
+  const chipLabels = (bookingModes: ('shop' | 'mobile')[]) => {
+    let renderer: ReturnType<typeof create>;
+    void act(() => {
+      renderer = create(createElement(AllServicesSheet, {
+        visible: true, onClose: jest.fn(), onBook: jest.fn(), vendorName: 'Test shop', bookingModes, services,
+      }));
+    });
+    const list = renderer!.root.findByType(FlatList).findAll((node) => node.type === 'Text');
+    const labels = list.map((node) => String(node.props.children));
+    void act(() => renderer!.unmount());
+    return labels;
+  };
+
+  it('labels each service with what it can be booked as, not the whole vendor', () => {
+    const labels = chipLabels(['shop', 'mobile']);
+    expect(labels).toContain('Shop Visit');
+    expect(labels).toContain('Shop Visit or Mobile Service');
+  });
+
+  it('marks a service the vendor cannot currently offer', () => {
+    expect(chipLabels(['mobile'])).toContain('Not currently bookable');
   });
 });

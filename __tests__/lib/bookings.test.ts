@@ -67,6 +67,7 @@ const makeService = (overrides: Partial<Service> = {}): Service => ({
   durationMinutes: 30,
   price: 80,
   active: true,
+  bookingEligibility: 'both',
   ...overrides,
 });
 
@@ -245,6 +246,35 @@ describe('createGuestBookingFromSelections', () => {
 });
 
 // ─── getBookingsForClient ─────────────────────────────────────────────────────
+
+describe('service eligibility at submission', () => {
+  const selections = {
+    vendor: { id: 'v1', name: 'Vendor' },
+    scheduledDate: '2026-12-01',
+    scheduledTime: '09:00',
+    bookingMode: 'mobile' as const,
+    mobileAddress: '1 Main St',
+    services: [makeService({ id: 'keep' }), makeService({ id: 'stale', title: 'Alignment', bookingEligibility: 'shop' })],
+  };
+  const message = 'Alignment is not available for Mobile Service. Please review your selected services.';
+
+  it('rejects a stale client selection without creating a booking', async () => {
+    await expect(createBookingFromSelections({
+      ...selections, vehicle: { id: 'veh-1' }, clientId: 'client-1',
+    })).rejects.toThrow(message);
+    expect(mockAddBooking).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale guest selection without creating a booking', async () => {
+    await expect(createGuestBookingFromSelections({
+      ...selections,
+      vehicle: { make: 'Honda', model: 'Civic', year: '2024' },
+      contact: { name: 'Jordan Lee', email: 'jordan@example.com', phone: '4165550182' },
+      idempotencyKey: 'key-1',
+    })).rejects.toThrow(message);
+    expect(mockAddBooking).not.toHaveBeenCalled();
+  });
+});
 
 describe('getBookingsForClient', () => {
   it('returns only bookings for the given clientId', () => {

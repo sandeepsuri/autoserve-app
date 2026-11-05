@@ -28,9 +28,10 @@ import { AppHeader } from '@/components/AppHeader';
 import { BookingSummaryCard } from '@/components/BookingSummaryCard';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
+import { ServiceRemovalNotice } from '@/components/ServiceRemovalNotice';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
-import { isBookableMode } from '@/lib/booking-types';
+import { getServiceEligibility, ineligibleReason, isBookableMode, isServiceEligible, SERVICE_ELIGIBILITY_LABELS } from '@/lib/booking-types';
 import { promptLeaveBooking, useBookingBack } from '@/lib/booking-navigation';
 import { createBookingFromSelections } from '@/lib/bookings';
 import { ensureProfileRow } from '@/lib/auth';
@@ -39,6 +40,7 @@ import { cancelUnpaidBookingAfterPaymentFailure, createBookingPayment } from '@/
 import { queryClient } from '@/lib/query-client';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { getVendorDetail } from '@/lib/vendors';
+import { useBookingServiceReconciliation } from '@/lib/use-booking-service-reconciliation';
 import { listVehicles } from '@/lib/vehicles';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBookingDraftStore } from '@/store/useBookingDraftStore';
@@ -157,6 +159,7 @@ export default function BookingScheduleScreen() {
     }
   }, [data, draft.bookingMode, updateDraft]);
   const services = data?.services ?? [];
+  const removalNotice = useBookingServiceReconciliation(data?.services);
 
   // Use server-loaded availability only; an unconfigured vendor yields an empty
   // (no-slot) availability so we show the honest "no availability" state.
@@ -299,7 +302,8 @@ export default function BookingScheduleScreen() {
       hasSelectedVehicle &&
       modeAvailable &&
       (draft.bookingMode !== 'mobile' || draft.mobileAddress?.trim()) &&
-      selectedServiceIds.length &&
+      selectedServices.length &&
+      selectedServices.every((service) => isServiceEligible(service, draft.bookingMode!)) &&
       draft.scheduledDate &&
       draft.scheduledTime,
   );
@@ -391,6 +395,9 @@ export default function BookingScheduleScreen() {
       });
     } catch (err) {
       Alert.alert('Booking failed', err instanceof Error ? err.message : String(err));
+      // The vendor may have changed since this screen loaded; show what is bookable now.
+      void queryClient.invalidateQueries({ queryKey: ['booking-vendor-services', draft.vendorId] });
+      void queryClient.invalidateQueries({ queryKey: ['booking-vendor-details', draft.vendorId] });
     } finally {
       setConfirming(false);
     }
@@ -449,6 +456,7 @@ export default function BookingScheduleScreen() {
               selectedServices.length ? `${selectedServices.length} selected` : 'Choose one or more'
             }
           />
+          <ServiceRemovalNotice message={removalNotice} />
           {services.length > 0 ? (
             <View style={styles.serviceList}>
               {services.map((service) => (
@@ -456,7 +464,7 @@ export default function BookingScheduleScreen() {
                   key={service.id}
                   service={service}
                   selected={selectedServiceIds.includes(service.id)}
-                  bookingMode={draft.bookingMode}
+                  disabledReason={ineligibleReason(service, draft.bookingMode)}
                   onPress={() => toggleService(service.id)}
                 />
               ))}
@@ -731,24 +739,24 @@ function PaymentOptionRow({
 function BookingServiceRow({
   service,
   selected,
-  bookingMode,
+  disabledReason,
   onPress,
 }: {
   service: Service;
   selected: boolean;
-  bookingMode?: 'shop' | 'mobile';
+  disabledReason?: string;
   onPress: () => void;
 }) {
-  const modeLabel =
-    bookingMode === 'mobile' ? 'Mobile service' : bookingMode === 'shop' ? 'Shop visit' : 'Shop or mobile';
+  const disabled = Boolean(disabledReason);
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.serviceRow, selected && styles.serviceRowSelected, pressed && styles.pressed]}
+      disabled={disabled}
+      style={({ pressed }) => [styles.serviceRow, selected && styles.serviceRowSelected, disabled && styles.serviceRowDisabled, pressed && styles.pressed]}
       accessibilityRole="button"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${service.title}, $${service.price}, ${service.durationMinutes} minutes`}
+      accessibilityState={{ selected, disabled }}
+      accessibilityLabel={`${service.title}, $${service.price}, ${service.durationMinutes} minutes${disabledReason ? `. ${disabledReason}` : ''}`}
     >
       <View style={styles.serviceCopy}>
         <Text style={styles.serviceTitle}>{service.title}</Text>
@@ -756,9 +764,10 @@ function BookingServiceRow({
           <Text style={styles.serviceDescription}>{service.description}</Text>
         ) : null}
         <View style={styles.serviceMeta}>
-          <Text style={styles.metaChip}>{modeLabel}</Text>
+          <Text style={styles.metaChip}>{SERVICE_ELIGIBILITY_LABELS[getServiceEligibility(service)]}</Text>
           <Text style={[styles.metaChip, styles.metaChipSuccess]}>{formatCategory(service.category)}</Text>
         </View>
+        {disabledReason ? <Text style={styles.validationText}>{disabledReason}</Text> : null}
       </View>
       <View style={styles.priceStack}>
         <Text style={styles.price}>${service.price}</Text>
@@ -845,6 +854,9 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.92,
+  },
+  serviceRowDisabled: {
+    backgroundColor: colors.bgBase,
   },
   serviceCopy: {
     flex: 1,

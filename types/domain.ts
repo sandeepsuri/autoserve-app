@@ -81,6 +81,9 @@ export interface VendorSummary {
   stripeAccountUpdatedAt?: string;
 }
 
+/** Which booking types a service can be booked under. */
+export type ServiceEligibility = BookingMode | 'both';
+
 export interface Service {
   id: string;
   vendorId: string;
@@ -89,6 +92,7 @@ export interface Service {
   durationMinutes: number;
   price: number;
   active: boolean;
+  bookingEligibility: ServiceEligibility;
   description?: string;
   image?: string;
 }
@@ -218,6 +222,8 @@ export interface BookingDraft {
   vendorId?: string;
   serviceId?: string;
   serviceIds?: string[];
+  /** Explains services removed because they can no longer be booked. */
+  serviceRemovalNotice?: string;
   vehicleId?: string;
   vehicleMake?: string;
   vehicleModel?: string;
