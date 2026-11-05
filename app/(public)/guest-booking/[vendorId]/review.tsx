@@ -11,6 +11,7 @@ import { BookingSummaryCard } from '@/components/BookingSummaryCard';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { isBookableMode } from '@/lib/booking-types';
 import { createGuestBookingFromSelections } from '@/lib/bookings';
 import { queryClient } from '@/lib/query-client';
 import { getVendorDetail } from '@/lib/vendors';
@@ -29,7 +30,7 @@ export default function GuestBookingReviewScreen() {
   if (isLoading) return <Screen><AppHeader title="Review request" fallbackHref={`/(public)/guest-booking/${vendorId}/details` as never} /></Screen>;
   const vendor = data?.vendor;
   const selectedServices = (data?.services ?? []).filter((service) => (draft.serviceIds ?? []).includes(service.id));
-  const complete = Boolean(vendor && draft.guestName && draft.guestEmail && draft.guestPhone && draft.vehicleMake && draft.vehicleModel && draft.vehicleYear && selectedServices.length && draft.scheduledDate && draft.scheduledTime && draft.bookingMode);
+  const complete = Boolean(vendor && draft.guestName && draft.guestEmail && draft.guestPhone && draft.vehicleMake && draft.vehicleModel && draft.vehicleYear && selectedServices.length && draft.scheduledDate && draft.scheduledTime && isBookableMode(vendor.bookingModes ?? [], draft.bookingMode));
   if (!complete || !vendor) return <Screen><AppHeader fallbackHref={`/(public)/guest-booking/${vendorId}/details` as never} /><EmptyState title="Booking details are incomplete" body="Return to the form and complete the required contact, vehicle, service, and schedule details." /><AppButton label="Return to form" onPress={() => router.replace(`/(public)/guest-booking/${vendorId}/details`)} /></Screen>;
 
   const subtotal = selectedServices.reduce((sum, service) => sum + service.price, 0);
@@ -62,7 +63,7 @@ export default function GuestBookingReviewScreen() {
     <View style={styles.progress}><View style={styles.active} /><View style={styles.active} /></View>
     <BookingSummaryCard title="Contact" rows={[{ label: 'Name', value: draft.guestName! }, { label: 'Email', value: draft.guestEmail! }, { label: 'Phone', value: draft.guestPhone! }]} />
     <BookingSummaryCard title="Vehicle" rows={[{ label: 'Vehicle', value: vehicleLabel }, { label: 'Colour / plate', value: [draft.vehicleColor, draft.vehiclePlate].filter(Boolean).join(' · ') || '—' }]} />
-    <BookingSummaryCard title="Appointment" rows={[{ label: 'Vendor', value: vendor.name }, { label: 'Services', value: selectedServices.map((service) => service.title).join(', ') }, { label: 'Date & time', value: `${draft.scheduledDate} · ${formatTimeDisplay(draft.scheduledTime!)}` }, { label: 'Visit type', value: draft.bookingMode === 'mobile' ? 'Mobile service' : 'Shop visit' }, { label: 'Estimate', value: `$${total.toFixed(2)}` }]} />
+    <BookingSummaryCard title="Appointment" rows={[{ label: 'Vendor', value: vendor.name }, { label: 'Services', value: selectedServices.map((service) => service.title).join(', ') }, { label: 'Date & time', value: `${draft.scheduledDate} · ${formatTimeDisplay(draft.scheduledTime!)}` }, { label: 'Booking type', value: draft.bookingMode === 'mobile' ? 'Mobile service' : 'Shop visit' }, { label: 'Estimate', value: `$${total.toFixed(2)}` }]} />
     {draft.notes ? <BookingSummaryCard title="Problem description" rows={[{ label: 'Details', value: draft.notes }]} /> : null}
     <AppCard style={styles.notice}><Text style={styles.noticeTitle}>No payment is due now</Text><Text style={styles.noticeBody}>This request will be pending vendor review. Pay the vendor directly after the service.</Text></AppCard>
     <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: consent }} onPress={() => setConsent((value) => !value)} style={styles.consent}><View style={[styles.checkbox, consent && styles.checked]}>{consent ? <Text style={styles.check}>✓</Text> : null}</View><Text style={styles.consentText}>I agree that {vendor.name} may use these contact details to respond to this booking request.</Text></Pressable>

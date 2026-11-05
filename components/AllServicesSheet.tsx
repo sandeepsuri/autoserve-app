@@ -15,13 +15,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/AppButton';
 import { FilterChip } from '@/components/FilterChip';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
-import { Service, ServiceCategory } from '@/types/domain';
+import { bookingTypesLabel } from '@/lib/booking-types';
+import { BookingMode, Service, ServiceCategory } from '@/types/domain';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   vendorName: string;
-  mobileServiceEnabled?: boolean;
+  bookingModes: BookingMode[];
   services: Service[];
   onBook: () => void;
 }
@@ -33,13 +34,13 @@ function capitalize(s: string): string {
 
 function ServiceListCard({
   service,
-  mobileServiceEnabled,
+  bookingModes,
 }: {
   service: Service;
-  mobileServiceEnabled?: boolean;
+  bookingModes: BookingMode[];
 }) {
-  const modeLabel = mobileServiceEnabled ? 'Shop or mobile' : 'Shop visit';
-  const modeIsGreen = Boolean(mobileServiceEnabled);
+  const modeLabel = bookingTypesLabel(bookingModes);
+  const modeIsGreen = bookingModes.includes('mobile');
 
   return (
     <View style={styles.card}>
@@ -82,7 +83,7 @@ function ServiceListCard({
   );
 }
 
-export function AllServicesSheet({ visible, onClose, vendorName, mobileServiceEnabled, services, onBook }: Props) {
+export function AllServicesSheet({ visible, onClose, vendorName, bookingModes, services, onBook }: Props) {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<'all' | ServiceCategory>('all');
@@ -229,7 +230,7 @@ export function AllServicesSheet({ visible, onClose, vendorName, mobileServiceEn
             renderItem={({ item }) => (
               <ServiceListCard
                 service={item}
-                mobileServiceEnabled={mobileServiceEnabled}
+                bookingModes={bookingModes}
               />
             )}
             ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
@@ -244,7 +245,8 @@ export function AllServicesSheet({ visible, onClose, vendorName, mobileServiceEn
               style={styles.footerButton}
             />
             <AppButton
-              label="Book Appointment"
+              label={bookingModes.length ? "Book Appointment" : "Bookings unavailable"}
+              disabled={!bookingModes.length}
               variant="accent"
               onPress={onBook}
               style={styles.footerButton}

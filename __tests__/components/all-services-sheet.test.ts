@@ -38,6 +38,7 @@ describe('AllServicesSheet search', () => {
         onClose: jest.fn(),
         onBook: jest.fn(),
         vendorName: 'Test shop',
+        bookingModes: ['shop', 'mobile'],
         services,
       }));
     });

@@ -60,7 +60,7 @@ export default function ConfirmationScreen() {
         title="Next steps"
         rows={[
           { label: 'Tracking', value: 'Follow status changes in My Bookings' },
-          { label: 'Service type', value: booking?.bookingMode === 'mobile' ? 'Mobile Service' : 'Shop Visit' },
+          { label: 'Booking type', value: booking?.bookingMode === 'mobile' ? 'Mobile Service' : 'Shop Visit' },
           { label: 'Estimate', value: booking ? `$${booking.total.toFixed(2)}` : 'Loading total…' },
           { label: 'Payment', value: booking ? bookingPaymentLabel(booking) : 'Loading…' },
         ]}

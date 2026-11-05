@@ -2,6 +2,7 @@ import { demoReviewsState, useDemoDataStore } from '@/store/useDemoDataStore';
 import { makeDefaultAvailability, makeEmptyAvailability } from '@/store/useVendorAvailabilityStore';
 import { DiscoveryFilters, Review, Service, VendorAvailability, VendorSummary } from '@/types/domain';
 
+import { getBookableModes } from './booking-types';
 import { loadVendorAvailability } from './vendor-availability';
 import { isDemoDataEnabled, isSupabaseConfigured, supabase } from './supabase';
 
@@ -14,7 +15,7 @@ const VENDOR_PUBLIC_VIEW = 'vendors_public';
 const VENDOR_PUBLIC_COLUMNS =
   'id,owner_id,business_type,name,description,address,distance_miles,rating,review_count,' +
   'mobile_service_enabled,service_radius_miles,next_available,hero_image,service_categories,' +
-  'latitude,longitude,business_hours,stripe_transfers_status,stripe_account_updated_at,is_active';
+  'latitude,longitude,business_hours,stripe_transfers_status,stripe_account_updated_at,is_active,location_mode,booking_modes';
 
 const defaultFilters: DiscoveryFilters = {
   query: '',
@@ -34,6 +35,8 @@ function mapVendorRow(item: Record<string, unknown>): VendorSummary {
     distanceMiles: (item.distance_miles as number) ?? 0,
     rating: (item.rating as number) ?? 0,
     reviewCount: (item.review_count as number) ?? 0,
+    locationMode: (item.location_mode as VendorSummary['locationMode']) ?? undefined,
+    bookingModes: (item.booking_modes as VendorSummary['bookingModes']) ?? [],
     mobileServiceEnabled: (item.mobile_service_enabled as boolean) ?? false,
     serviceRadiusMiles: (item.service_radius_miles as number) ?? 0,
     nextAvailable: (item.next_available as string) ?? 'Schedule pending',
@@ -83,7 +86,7 @@ function filterVendors(vendors: VendorSummary[], filters: DiscoveryFilters) {
       !filters.query ||
       vendor.name.toLowerCase().includes(filters.query.toLowerCase()) ||
       vendor.description.toLowerCase().includes(filters.query.toLowerCase());
-    const matchesMobile = !filters.mobileOnly || vendor.mobileServiceEnabled;
+    const matchesMobile = !filters.mobileOnly || vendor.bookingModes?.includes('mobile');
     const matchesRating = vendor.rating >= filters.minimumRating;
     const matchesCategory = filters.category === 'all' || vendor.serviceCategories.includes(filters.category);
 
@@ -94,7 +97,10 @@ function filterVendors(vendors: VendorSummary[], filters: DiscoveryFilters) {
 export async function listVendors(filters: Partial<DiscoveryFilters> = {}) {
   const merged = { ...defaultFilters, ...filters };
   if (!isSupabaseConfigured || !supabase) {
-    return isDemoDataEnabled ? filterVendors(useDemoDataStore.getState().vendors, merged) : [];
+    const demo = useDemoDataStore.getState();
+    return isDemoDataEnabled ? filterVendors(demo.vendors.map((vendor) => ({
+      ...vendor, bookingModes: getBookableModes(vendor, demo.vendorAvailabilities?.[vendor.id] ?? makeDefaultAvailability()),
+    })), merged) : [];
   }
 
   const { data, error } = await supabase.from(VENDOR_PUBLIC_VIEW).select(VENDOR_PUBLIC_COLUMNS).eq('is_active', true);
@@ -126,7 +132,7 @@ export async function getVendorDetail(vendorId: string): Promise<{
     const vendor = demo.vendors.find((item) => item.id === vendorId) ?? null;
     const demoAvailability = demo.vendorAvailabilities?.[vendorId] ?? makeDefaultAvailability();
     return {
-      vendor,
+      vendor: vendor ? { ...vendor, bookingModes: getBookableModes(vendor, demoAvailability) } : null,
       services: demo.services.filter((item) => item.vendorId === vendorId && item.active),
       reviews: demoReviewsState.filter((item) => item.vendorId === vendorId),
       businessHours: [] as { day: string; hours: string }[],
@@ -167,6 +173,7 @@ export async function getVendorDetail(vendorId: string): Promise<{
 
   const vendorRow = vendorResult.data as unknown as Record<string, unknown>;
   const vendor = mapVendorRow(vendorRow);
+  vendor.bookingModes = getBookableModes(vendor, availability);
   const businessHours = Array.isArray(vendorRow.business_hours)
     ? (vendorRow.business_hours as { day: string; hours: string }[])
     : [];

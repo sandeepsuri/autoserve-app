@@ -68,6 +68,8 @@ export interface VendorSummary {
   distanceMiles: number;
   rating: number;
   reviewCount: number;
+  locationMode?: VendorLocationMode;
+  bookingModes?: BookingMode[];
   mobileServiceEnabled: boolean;
   serviceRadiusMiles: number;
   nextAvailable: string;

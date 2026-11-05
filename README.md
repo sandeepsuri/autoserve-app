@@ -74,3 +74,16 @@ Tests live in `__tests__/`.
 This repository contains the client and vendor mobile app only.
 
 Internal admin operations are handled by a separate admin portal.
+
+### Bookable booking types (issue #21)
+
+Before testing this app build, apply
+`supabase/migrations/20261105000000_bookable_booking_types.sql` after the existing
+public vendor view, booking security, and guest booking migrations. It adds current
+booking types to discovery and enforces them for slot lookup and booking creation.
+Stored booking values remain `shop` and `mobile`.
+
+Run `supabase/tests/bookable_booking_types.sql` as postgres in a disposable test
+Supabase database after applying the migration. It covers discovery, slots, client
+and guest creation, and stale rejection for fixed, mobile, hybrid, and neither
+configurations; all fixtures roll back.

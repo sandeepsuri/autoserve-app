@@ -72,7 +72,7 @@ const OPEN_DAY = { bookable: true, openTime: '09:00', closeTime: '11:00' };
 const vendorDetail = {
   vendor: {
     id: 'v1', name: 'Test Garage', address: '1 Main St', rating: 5, reviewCount: 1,
-    description: 'Great', heroImage: 'hero', mobileServiceEnabled: true,
+    description: 'Great', heroImage: 'hero', mobileServiceEnabled: true, bookingModes: ['shop', 'mobile'],
   },
   services: [
     { id: 's1', vendorId: 'v1', title: 'Oil change', category: 'oil', price: 70, durationMinutes: 30, active: true },
@@ -174,6 +174,7 @@ async function completeFlowToSchedule() {
   await screen.findByText('1. Booking details');
   await screen.findByText('Mobile Service');
   press('Mobile Service');
+  fireEvent.changeText(screen.getByPlaceholderText('Enter the service address'), '123 Main St');
   fireEvent.changeText(screen.getByPlaceholderText(/Brake squeal/), 'Rattling noise');
   press('Continue to Service & Time');
   await screen.findByText('2. Services, date, and time');
@@ -334,7 +335,7 @@ describe('client booking: other exits', () => {
     signIn();
     const date = new Date(Date.now() + 2 * 86_400_000);
     const scheduledDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    useBookingDraftStore.setState({ draft: { vendorId: 'v1', scheduledDate, scheduledTime: '09:30' } });
+    useBookingDraftStore.setState({ draft: { vendorId: 'v1', bookingMode: 'shop', scheduledDate, scheduledTime: '09:30' } });
 
     renderRouter(routes, { initialUrl: '/(client)/booking/schedule' });
     await settle();

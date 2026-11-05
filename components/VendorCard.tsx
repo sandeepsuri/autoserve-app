@@ -21,7 +21,7 @@ export function VendorCard({ vendor, distanceMiles, onPress, onBook }: Props) {
       <AppCard style={styles.card}>
         <Image source={vendor.heroImage} style={styles.image} contentFit="cover" />
         <View style={styles.content}>
-          {vendor.mobileServiceEnabled ? (
+          {vendor.bookingModes?.includes('mobile') ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>Mobile Service Available</Text>
             </View>
@@ -32,7 +32,7 @@ export function VendorCard({ vendor, distanceMiles, onPress, onBook }: Props) {
             {distanceMiles != null ? ` · ${distanceMiles.toFixed(1)} mi away` : ''}
           </Text>
           <Text style={styles.description}>{vendor.description}</Text>
-          <AppButton label="Book Service" variant="primary" onPress={onBook} />
+          <AppButton label={vendor.bookingModes?.length ? "Book Service" : "Bookings unavailable"} disabled={!vendor.bookingModes?.length} variant="primary" onPress={onBook} />
         </View>
       </AppCard>
     </Pressable>
