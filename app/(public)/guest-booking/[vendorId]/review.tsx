@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { ServiceRemovalNotice } from '@/components/ServiceRemovalNotice';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { calculateBookingPrice, formatDuration, formatPrice, totalDurationMinutes } from '@/lib/booking-summary';
 import { ineligibleReason, isBookableMode } from '@/lib/booking-types';
 import { createGuestBookingFromSelections } from '@/lib/bookings';
 import { queryClient } from '@/lib/query-client';
@@ -26,6 +27,7 @@ export default function GuestBookingReviewScreen() {
   const { draft, clearDraft, setSubmittedGuestBooking } = useBookingDraftStore();
   const [consent, setConsent] = useState(Boolean(draft.guestContactConsent));
   const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false);
   const idempotencyKey = useRef(Crypto.randomUUID()).current;
   const { data, isLoading } = useQuery({ queryKey: ['guest-booking-vendor', vendorId], queryFn: () => getVendorDetail(vendorId), enabled: Boolean(vendorId) });
 
@@ -37,12 +39,12 @@ export default function GuestBookingReviewScreen() {
   const complete = Boolean(vendor && draft.guestName && draft.guestEmail && draft.guestPhone && draft.vehicleMake && draft.vehicleModel && draft.vehicleYear && selectedServices.length && selectedServices.every((service) => !ineligibleReason(service, draft.bookingMode)) && draft.scheduledDate && draft.scheduledTime && isBookableMode(vendor.bookingModes ?? [], draft.bookingMode));
   if (!complete || !vendor) return <Screen><AppHeader fallbackHref={`/(public)/guest-booking/${vendorId}/details` as never} /><EmptyState title="Booking details are incomplete" body="Return to the form and complete the required contact, vehicle, service, and schedule details." /><AppButton label="Return to form" onPress={() => router.replace(`/(public)/guest-booking/${vendorId}/details`)} /></Screen>;
 
-  const subtotal = selectedServices.reduce((sum, service) => sum + service.price, 0);
-  const total = Math.round(subtotal * 1.12 * 100) / 100;
+  const { total } = calculateBookingPrice(selectedServices);
   const vehicleLabel = `${draft.vehicleYear} ${draft.vehicleMake} ${draft.vehicleModel}${draft.vehicleTrim ? ` ${draft.vehicleTrim}` : ''}`;
 
   const submit = async () => {
-    if (!consent || submitting) return;
+    if (!consent || submitLock.current) return;
+    submitLock.current = true;
     setSubmitting(true);
     try {
       const booking = await createGuestBookingFromSelections({
@@ -61,7 +63,7 @@ export default function GuestBookingReviewScreen() {
       Alert.alert('Could not send request', error instanceof Error ? error.message : 'Please try again.');
       // The vendor may have changed since this screen loaded; show what is bookable now.
       void queryClient.invalidateQueries({ queryKey: ['guest-booking-vendor', vendorId] });
-    } finally { setSubmitting(false); }
+    } finally { submitLock.current = false; setSubmitting(false); }
   };
 
   return <Screen>
@@ -70,7 +72,7 @@ export default function GuestBookingReviewScreen() {
     <ServiceRemovalNotice message={removalNotice} />
     <BookingSummaryCard title="Contact" rows={[{ label: 'Name', value: draft.guestName! }, { label: 'Email', value: draft.guestEmail! }, { label: 'Phone', value: draft.guestPhone! }]} />
     <BookingSummaryCard title="Vehicle" rows={[{ label: 'Vehicle', value: vehicleLabel }, { label: 'Colour / plate', value: [draft.vehicleColor, draft.vehiclePlate].filter(Boolean).join(' · ') || '—' }]} />
-    <BookingSummaryCard title="Appointment" rows={[{ label: 'Vendor', value: vendor.name }, { label: 'Services', value: selectedServices.map((service) => service.title).join(', ') }, { label: 'Date & time', value: `${draft.scheduledDate} · ${formatTimeDisplay(draft.scheduledTime!)}` }, { label: 'Booking type', value: draft.bookingMode === 'mobile' ? 'Mobile service' : 'Shop visit' }, { label: 'Estimate', value: `$${total.toFixed(2)}` }]} />
+    <BookingSummaryCard title="Appointment" rows={[{ label: 'Vendor', value: vendor.name }, { label: 'Services', value: selectedServices.map((service) => `${service.title} · ${formatPrice(service.price)}`).join('\n') }, { label: 'Total duration', value: formatDuration(totalDurationMinutes(selectedServices)) }, { label: 'Date & time', value: `${draft.scheduledDate} · ${formatTimeDisplay(draft.scheduledTime!)}` }, { label: 'Booking type', value: draft.bookingMode === 'mobile' ? 'Mobile service' : 'Shop visit' }, { label: 'Location', value: (draft.bookingMode === 'mobile' ? draft.mobileAddress : vendor.address) ?? '—' }, { label: 'Estimate incl. fee', value: formatPrice(total) }]} />
     {draft.notes ? <BookingSummaryCard title="Problem description" rows={[{ label: 'Details', value: draft.notes }]} /> : null}
     <AppCard style={styles.notice}><Text style={styles.noticeTitle}>No payment is due now</Text><Text style={styles.noticeBody}>This request will be pending vendor review. Pay the vendor directly after the service.</Text></AppCard>
     <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: consent }} onPress={() => setConsent((value) => !value)} style={styles.consent}><View style={[styles.checkbox, consent && styles.checked]}>{consent ? <Text style={styles.check}>✓</Text> : null}</View><Text style={styles.consentText}>I agree that {vendor.name} may use these contact details to respond to this booking request.</Text></Pressable>

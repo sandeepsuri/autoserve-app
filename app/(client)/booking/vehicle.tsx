@@ -6,11 +6,14 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
+import { BookingSelectionSummary } from '@/components/BookingSelectionSummary';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { colors, radius, spacing, typography } from '@/constants/theme';
 import { useBookingBack } from '@/lib/booking-navigation';
+import { formatVehicleLabel } from '@/lib/booking-summary';
 import { listVehicles } from '@/lib/vehicles';
+import { getVendorDetail } from '@/lib/vendors';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBookingDraftStore } from '@/store/useBookingDraftStore';
 import { Vehicle } from '@/types/domain';
@@ -24,6 +27,12 @@ export default function BookingVehicleScreen() {
   const { data: vehicles = [], isLoading } = useQuery({
     queryKey: ['client-vehicles', vehicleOwnerKey],
     queryFn: listVehicles,
+  });
+
+  const { data: vendorDetail } = useQuery({
+    queryKey: ['booking-vendor-details', draft.vendorId],
+    queryFn: () => getVendorDetail(draft.vendorId!),
+    enabled: Boolean(draft.vendorId),
   });
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -111,6 +120,9 @@ export default function BookingVehicleScreen() {
     );
   }
 
+  const selectedVehicle = vehicles.find((vehicle) => vehicle.id === selectedId);
+  const selectedServices = (vendorDetail?.services ?? []).filter((service) => draft.serviceIds?.includes(service.id));
+
   return (
     <Screen>
       <AppHeader
@@ -118,6 +130,13 @@ export default function BookingVehicleScreen() {
         subtitle="Choose the vehicle for this booking."
         fallbackHref="/(client)"
         onBack={handleBack}
+      />
+
+      <BookingSelectionSummary
+        title="Your booking"
+        vendorName={vendorDetail?.vendor?.name ?? 'Selected vendor'}
+        vehicleLabel={selectedVehicle ? formatVehicleLabel(selectedVehicle) : 'Choose a vehicle below'}
+        services={selectedServices}
       />
 
       {vehicles.map((vehicle) => (
