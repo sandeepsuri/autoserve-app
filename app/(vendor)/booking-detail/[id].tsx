@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Alert, BackHandler, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppHeader } from '@/components/AppHeader';
@@ -31,6 +31,15 @@ export default function VendorBookingDetailScreen() {
     queryKey: ['vendor-payout-status'],
     queryFn: getCurrentVendorPayoutStatus,
   });
+
+  useFocusEffect(useCallback(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (router.canGoBack()) return false;
+      router.replace('/(vendor)/bookings');
+      return true;
+    });
+    return () => subscription.remove();
+  }, [router]));
 
   if (isLoading) {
     return (
@@ -79,7 +88,8 @@ export default function VendorBookingDetailScreen() {
         queryClient.invalidateQueries({ queryKey: ['client-bookings'] }),
         queryClient.invalidateQueries({ queryKey: ['booking-detail', id] }),
       ]);
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace('/(vendor)/bookings');
     } catch (err) {
       Alert.alert('Could not update booking', err instanceof Error ? err.message : String(err));
     } finally {

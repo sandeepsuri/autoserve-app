@@ -246,7 +246,7 @@ describe('active-vendor gating (ticket 06)', () => {
       call++;
       if (call === 1) return { select: jest.fn().mockReturnValue({ eq: eqId }) };
       if (call === 2) {
-        return makeChain({ eq: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ data: [] }) }) });
+        return makeChain({ eq: jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue(makeChain({ data: [] })) }) });
       }
       return makeChain({ eq: jest.fn().mockReturnValue({ order: jest.fn().mockResolvedValue({ data: [] }) }) });
     });
@@ -263,6 +263,7 @@ describe('getVendorDetail', () => {
       makeChain({
         eq: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
+            ...makeChain({ data: [] }),
             maybeSingle: jest.fn().mockResolvedValue({ data: null }),
           }),
           order: jest.fn().mockResolvedValue({ data: [], error: null }),
@@ -302,7 +303,7 @@ describe('getVendorDetail', () => {
         });
       }
       if (callCount === 2) {
-        return makeChain({ eq: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ data: [serviceRow] }) }) });
+        return makeChain({ eq: jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue(makeChain({ data: [serviceRow] })) }) });
       }
       return makeChain({ eq: jest.fn().mockReturnValue({ order: jest.fn().mockResolvedValue({ data: [reviewRow] }) }) });
     });

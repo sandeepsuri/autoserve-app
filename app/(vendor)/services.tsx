@@ -6,11 +6,13 @@ import {
   Alert,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,8 +27,9 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { StatCard } from '@/components/StatCard';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { listBookingsForVendorOwner } from '@/lib/bookings';
-import { durationSchema, priceSchema, requiredText, sanitizeText } from '@/lib/validation';
-import { getVendorForOwner, listVendorServices, removeVendorService, upsertVendorService } from '@/lib/vendor-admin';
+import { durationSchema, priceSchema, requiredText, sanitizeTextInput } from '@/lib/validation';
+import { listVendorServices, removeVendorService, upsertVendorService } from '@/lib/vendor-admin';
+import { useVendorIdentity } from '@/lib/use-vendor-identity';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Service, ServiceCategory } from '@/types/domain';
 
@@ -168,20 +171,26 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
       price: editTarget ? String(editTarget.price) : '95',
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editTarget?.id]);
+  }, [visible, editTarget?.id]);
 
   const submit = handleSubmit(async (values) => {
-    await upsertVendorService({
-      id: editTarget?.id ?? `service-${Date.now()}`,
-      vendorId,
-      title: values.title,
-      category: values.category as ServiceCategory,
-      durationMinutes: Number(values.durationMinutes),
-      price: Number(values.price),
-      active: editTarget?.active ?? true,
-    });
-    await queryClient.invalidateQueries({ queryKey: ['vendor-services', ownerId] });
-    onSaved();
+    try {
+      await upsertVendorService({
+        ...editTarget,
+        id: editTarget?.id ?? `service-${Date.now()}`,
+        vendorId,
+        title: values.title,
+        category: values.category as ServiceCategory,
+        durationMinutes: Number(values.durationMinutes),
+        price: Number(values.price),
+        active: editTarget?.active ?? true,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['vendor-services', ownerId] });
+      await queryClient.invalidateQueries({ queryKey: ['vendor-detail', vendorId] });
+      onSaved();
+    } catch (error) {
+      Alert.alert('Could not save service', error instanceof Error ? error.message : 'Please try again.');
+    }
   });
 
   function handleDelete() {
@@ -196,7 +205,10 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
           style: 'destructive',
           onPress: async () => {
             await removeVendorService(editTarget.id);
-            await queryClient.invalidateQueries({ queryKey: ['vendor-services', ownerId] });
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['vendor-services', ownerId] }),
+              queryClient.invalidateQueries({ queryKey: ['vendor-detail', vendorId] }),
+            ]);
             onClose();
           },
         },
@@ -215,7 +227,7 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
           <View style={modalStyles.cancelButton} />
         </View>
 
-        <ScrollView style={modalStyles.scroll} contentContainerStyle={modalStyles.scrollContent}>
+        <ScrollView style={modalStyles.scroll} contentContainerStyle={modalStyles.scrollContent} keyboardShouldPersistTaps="handled">
           <Controller
             control={control}
             name="title"
@@ -224,7 +236,7 @@ function ServiceModal({ visible, editTarget, vendorId, ownerId, onClose, onSaved
                 label="Service name"
                 required
                 value={f.value}
-                onChangeText={(text) => f.onChange(sanitizeText(text, 60))}
+                onChangeText={(text) => f.onChange(sanitizeTextInput(text, 60))}
                 placeholder="e.g. Full Synthetic Oil Change"
                 maxLength={60}
                 errorText={errors.title?.message}
@@ -464,9 +476,10 @@ interface VendorServiceCardProps {
   monthlyCount: number;
   onToggle: (active: boolean) => void;
   onEdit: () => void;
+  compact: boolean;
 }
 
-function VendorServiceCard({ service, modeLabel, monthlyCount, onToggle, onEdit }: VendorServiceCardProps) {
+function VendorServiceCard({ service, modeLabel, monthlyCount, onToggle, onEdit, compact }: VendorServiceCardProps) {
   const { bg, fg } = categoryColors(service.category);
   const abbr = categoryAbbr(service.category);
 
@@ -506,7 +519,7 @@ function VendorServiceCard({ service, modeLabel, monthlyCount, onToggle, onEdit 
       </View>
 
       {/* Performance + edit action */}
-      <View style={cardStyles.actionsRow}>
+      <View style={[cardStyles.actionsRow, compact && cardStyles.actionsStack]}>
         {service.active ? (
           <Text style={cardStyles.performance}>
             <Text style={cardStyles.performanceCount}>{monthlyCount} booking{monthlyCount !== 1 ? 's' : ''}</Text>
@@ -515,7 +528,7 @@ function VendorServiceCard({ service, modeLabel, monthlyCount, onToggle, onEdit 
         ) : (
           <Text style={cardStyles.paused}>Paused · hidden from customers</Text>
         )}
-        <Pressable onPress={onEdit} style={cardStyles.editButton}>
+        <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel={`Edit ${service.title}`} style={cardStyles.editButton}>
           <Text style={cardStyles.editLabel}>Edit service</Text>
         </Pressable>
       </View>
@@ -526,7 +539,8 @@ function VendorServiceCard({ service, modeLabel, monthlyCount, onToggle, onEdit 
 const cardStyles = StyleSheet.create({
   card: {
     gap: spacing.md,
-    borderRadius: 18,
+    borderRadius: radius.md,
+    alignSelf: 'stretch',
   },
   topRow: {
     flexDirection: 'row',
@@ -548,15 +562,19 @@ const cardStyles = StyleSheet.create({
   },
   nameBlock: {
     flex: 1,
+    minWidth: 0,
     gap: spacing.xs,
   },
   serviceTitle: {
     ...typography.labelMd,
     color: colors.textPrimary,
-    lineHeight: 19,
+    lineHeight: 22,
+    paddingBottom: 2,
   },
   metaLabel: {
     ...typography.caption,
+    lineHeight: 18,
+    paddingBottom: 2,
     color: colors.textTertiary,
   },
   metaGrid: {
@@ -589,9 +607,15 @@ const cardStyles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
+  actionsStack: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
   performance: {
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 11,
+    lineHeight: 17,
+    paddingBottom: 2,
     color: colors.textSecondary,
     flex: 1,
   },
@@ -602,10 +626,16 @@ const cardStyles = StyleSheet.create({
   paused: {
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 11,
+    lineHeight: 17,
+    paddingBottom: 2,
     color: colors.textSecondary,
     flex: 1,
   },
   editButton: {
+    minHeight: 44,
+    flexShrink: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.borderDefault,
     borderRadius: radius.full,
@@ -614,6 +644,8 @@ const cardStyles = StyleSheet.create({
     backgroundColor: colors.bgElevated,
   },
   editLabel: {
+    lineHeight: 18,
+    paddingBottom: 2,
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 11,
     color: colors.surfaceBrand,
@@ -628,16 +660,16 @@ export default function VendorServicesScreen() {
   const queryClient = useQueryClient();
   const ownerId = useAuthStore((state) => state.session?.userId);
 
-  const { data: vendor } = useQuery({
-    queryKey: ['vendor-self', ownerId],
-    queryFn: getVendorForOwner,
-    enabled: Boolean(ownerId),
-  });
+  const { data: vendor } = useVendorIdentity();
+  const { width, fontScale } = useWindowDimensions();
+  const compact = width < 360 || fontScale > 1.2;
 
   const {
     data: services = [],
     isLoading,
     isError,
+    isRefetching,
+    refetch,
   } = useQuery({
     queryKey: ['vendor-services', ownerId],
     queryFn: listVendorServices,
@@ -699,7 +731,10 @@ export default function VendorServicesScreen() {
     );
     try {
       await upsertVendorService({ ...service, active: newActive });
-      await queryClient.invalidateQueries({ queryKey: ['vendor-services', ownerId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['vendor-services', ownerId] }),
+        queryClient.invalidateQueries({ queryKey: ['vendor-detail', service.vendorId] }),
+      ]);
     } catch {
       // Roll back
       queryClient.setQueryData<Service[]>(['vendor-services', ownerId], (old = []) =>
@@ -738,6 +773,7 @@ export default function VendorServicesScreen() {
         contentContainerStyle={screenStyles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} />}
       >
         {/* Page header */}
         <View style={screenStyles.pageHeader}>
@@ -766,7 +802,7 @@ export default function VendorServicesScreen() {
               placeholder="Search services"
               placeholderTextColor={colors.textTertiary}
               value={searchQuery}
-              onChangeText={(text) => setSearchQuery(sanitizeText(text, 80))}
+              onChangeText={(text) => setSearchQuery(sanitizeTextInput(text, 80))}
               returnKeyType="search"
               autoCorrect={false}
               maxLength={80}
@@ -793,7 +829,7 @@ export default function VendorServicesScreen() {
         ) : null}
 
         {/* Add banner */}
-        <Pressable style={screenStyles.addBanner} onPress={openAdd} accessibilityRole="button">
+        <Pressable style={screenStyles.addBanner} onPress={openAdd} accessibilityRole="button" accessibilityLabel="Add a new service">
           <View style={screenStyles.addBannerText}>
             <Text style={screenStyles.addBannerTitle}>Add a new service</Text>
             <Text style={screenStyles.addBannerBody}>
@@ -839,6 +875,7 @@ export default function VendorServicesScreen() {
                 key={service.id}
                 service={service}
                 modeLabel={modeLabel}
+                compact={compact}
                 monthlyCount={monthlyCountPerService[service.id] ?? 0}
                 onToggle={(active) => handleToggle(service, active)}
                 onEdit={() => openEdit(service)}
@@ -893,7 +930,8 @@ const screenStyles = StyleSheet.create({
   pageTitle: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 28,
-    lineHeight: 32,
+    lineHeight: 38,
+    paddingBottom: 2,
     letterSpacing: -0.5,
     color: colors.textPrimary,
   },
@@ -945,6 +983,9 @@ const screenStyles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    minWidth: 0,
+    paddingVertical: spacing.sm,
+    lineHeight: 22,
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 14,
     color: colors.textPrimary,

@@ -10,11 +10,13 @@ import { Screen } from '@/components/Screen';
 import { SignOutButton } from '@/components/SignOutButton';
 import { colors, spacing, typography } from '@/constants/theme';
 import { getCurrentVendorPayoutStatus, startVendorPayoutOnboarding } from '@/lib/vendor-payouts';
+import { useVendorIdentity } from '@/lib/use-vendor-identity';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export default function VendorProfileScreen() {
   const queryClient = useQueryClient();
   const { profile, session } = useAuthStore();
+  const { data: shop, isLoading: shopLoading } = useVendorIdentity();
   const [startingPayouts, setStartingPayouts] = useState(false);
 
   const { data: vendor } = useQuery({
@@ -23,6 +25,7 @@ export default function VendorProfileScreen() {
     enabled: Boolean(session),
   });
 
+  const shopName = shop?.name ?? (shopLoading ? 'Loading shop…' : 'No active shop');
   const payoutStatus = vendor?.stripeTransfersStatus ?? 'inactive';
   const payoutCopy =
     payoutStatus === 'active'
@@ -47,9 +50,11 @@ export default function VendorProfileScreen() {
   return (
     <Screen>
       <Text style={typography.titleLg}>Vendor profile</Text>
+      <Text style={styles.shopName}>{shopName}</Text>
       <BookingSummaryCard
         title="Business profile"
         rows={[
+          { label: 'Shop', value: shopName },
           { label: 'Contact', value: profile?.fullName ?? 'Vendor' },
           { label: 'Email', value: session?.email ?? 'No email' },
           { label: 'Account type', value: profile?.businessType ?? 'shop' },
@@ -78,6 +83,11 @@ export default function VendorProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  shopName: {
+    ...typography.titleSm,
+    lineHeight: 26,
+    paddingBottom: 2,
+  },
   cardHeader: {
     gap: spacing.sm,
     marginBottom: spacing.md,

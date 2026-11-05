@@ -142,7 +142,8 @@ export async function getVendorDetail(vendorId: string): Promise<{
 
   const [vendorResult, servicesResult, reviewsResult, availability] = await Promise.all([
     supabase.from(VENDOR_PUBLIC_VIEW).select(VENDOR_PUBLIC_COLUMNS).eq('id', vendorId).eq('is_active', true).maybeSingle(),
-    supabase.from('services').select('*').eq('vendor_id', vendorId).eq('active', true),
+    supabase.from('services').select('*').eq('vendor_id', vendorId).eq('active', true)
+      .order('catalogue_order', { ascending: true }).order('id', { ascending: true }),
     supabase.from('reviews').select('*').eq('vendor_id', vendorId).order('created_at', { ascending: false }),
     // Client-facing: fall back to an empty (no-slot) availability so an
     // unconfigured vendor shows "no availability" instead of fabricated slots.

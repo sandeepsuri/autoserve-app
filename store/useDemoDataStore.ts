@@ -76,7 +76,7 @@ export const useDemoDataStore = create<DemoDataState>()(
         set((state) => ({
           services: state.services.some((item) => item.id === service.id)
             ? state.services.map((item) => (item.id === service.id ? service : item))
-            : [service, ...state.services],
+            : [...state.services, service],
         })),
       removeService: (serviceId) =>
         set((state) => ({ services: state.services.filter((item) => item.id !== serviceId) })),
