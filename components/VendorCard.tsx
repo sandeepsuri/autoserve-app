@@ -9,11 +9,13 @@ import { AppCard } from './AppCard';
 
 interface Props {
   vendor: VendorSummary;
+  /** Real distance from the client; omitted from the card when unknown. */
+  distanceMiles?: number | null;
   onPress?: () => void;
   onBook?: () => void;
 }
 
-export function VendorCard({ vendor, onPress, onBook }: Props) {
+export function VendorCard({ vendor, distanceMiles, onPress, onBook }: Props) {
   return (
     <Pressable onPress={onPress}>
       <AppCard style={styles.card}>
@@ -25,7 +27,10 @@ export function VendorCard({ vendor, onPress, onBook }: Props) {
             </View>
           ) : null}
           <Text style={typography.titleSm}>{vendor.name}</Text>
-          <Text style={styles.meta}>⭐ {vendor.rating.toFixed(1)} · {vendor.distanceMiles.toFixed(1)} mi away</Text>
+          <Text style={styles.meta}>
+            ⭐ {vendor.rating.toFixed(1)}
+            {distanceMiles != null ? ` · ${distanceMiles.toFixed(1)} mi away` : ''}
+          </Text>
           <Text style={styles.description}>{vendor.description}</Text>
           <AppButton label="Book Service" variant="primary" onPress={onBook} />
         </View>
