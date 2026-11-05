@@ -73,18 +73,21 @@ export default function GarageEditScreen() {
 
   // ─── Catalog queries ────────────────────────────────────────────────────────
 
-  const { data: makes = [], isLoading: makesLoading } = useQuery({
+  const { data: makes = [], isFetching: makesLoading, error: makesError, refetch: retryMakes } = useQuery({
+    retry: false,
     queryKey: ['vehicle-makes'],
     queryFn: listVehicleMakes,
   });
 
-  const { data: models = [], isLoading: modelsLoading } = useQuery({
+  const { data: models = [], isFetching: modelsLoading, error: modelsError, refetch: retryModels } = useQuery({
+    retry: false,
     queryKey: ['vehicle-models', make],
     queryFn: () => listVehicleModels(make),
     enabled: make.trim().length > 0,
   });
 
-  const { data: years = [], isLoading: yearsLoading } = useQuery({
+  const { data: years = [], isFetching: yearsLoading, error: yearsError, refetch: retryYears } = useQuery({
+    retry: false,
     queryKey: ['vehicle-years', make, model],
     queryFn: () => listVehicleYears(make, model),
     enabled: make.trim().length > 0 && model.trim().length > 0,
@@ -187,6 +190,8 @@ export default function GarageEditScreen() {
           onChange={handleMakeChange}
           options={makes}
           isLoading={makesLoading}
+          loadError={makesError?.message}
+          onRetry={() => { void retryMakes(); }}
           placeholder="Search makes…"
           required
           errorText={touched.make ? errors.make : undefined}
@@ -202,6 +207,8 @@ export default function GarageEditScreen() {
           onChange={handleModelChange}
           options={models}
           isLoading={modelsLoading}
+          loadError={modelsError?.message}
+          onRetry={() => { void retryModels(); }}
           placeholder="Search models…"
           required
           disabled={make.trim().length === 0}
@@ -219,6 +226,8 @@ export default function GarageEditScreen() {
           onChange={handleYearChange}
           options={years}
           isLoading={yearsLoading}
+          loadError={yearsError?.message}
+          onRetry={() => { void retryYears(); }}
           placeholder="Search years…"
           required
           disabled={make.trim().length === 0 || model.trim().length === 0}
