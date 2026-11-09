@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
+import { AutoServeLogo } from '@/components/AutoServeLogo';
 import { Screen } from '@/components/Screen';
 import { colors, spacing, typography } from '@/constants/theme';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -15,7 +16,7 @@ export default function WelcomeScreen() {
   return (
     <Screen scroll={false} contentStyle={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.brand}>AutoServe</Text>
+        <AutoServeLogo />
         <Text style={styles.tagline}>Premium automotive care at your fingertips.</Text>
       </View>
 
@@ -60,10 +61,6 @@ const styles = StyleSheet.create({
   header: {
     gap: spacing.md,
     paddingTop: spacing.section,
-  },
-  brand: {
-    ...typography.displayMd,
-    color: colors.bgStrong,
   },
   tagline: {
     ...typography.bodyLg,

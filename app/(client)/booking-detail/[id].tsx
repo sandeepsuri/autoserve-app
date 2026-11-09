@@ -88,7 +88,7 @@ export default function BookingDetailScreen() {
         title={booking.vendorName ?? 'Booking summary'}
         rows={[
           { label: 'Date & Time', value: schedule },
-          { label: 'Mode', value: booking.bookingMode === 'mobile' ? 'Mobile service' : 'At the shop' },
+          { label: 'Booking type', value: booking.bookingMode === 'mobile' ? 'Mobile service' : 'At the shop' },
           { label: 'Location', value: location },
         ]}
       />

@@ -8,7 +8,7 @@ import { FilterChip } from '@/components/FilterChip';
 import { OnboardingStepShell } from '@/components/onboarding/OnboardingStepShell';
 import { SectionHeader } from '@/components/SectionHeader';
 import { colors, radius, spacing, typography } from '@/constants/theme';
-import { durationSchema, priceSchema, sanitizeText } from '@/lib/validation';
+import { durationSchema, priceSchema, sanitizeTextInput } from '@/lib/validation';
 import { saveVendorOnboardingDraft } from '@/lib/vendor-onboarding';
 import { useVendorOnboardingStore } from '@/store/useVendorOnboardingStore';
 import { ServiceCategory, VendorOnboardingServiceDraft } from '@/types/domain';
@@ -312,7 +312,7 @@ export default function ServicesStep() {
           label="Service name"
           required
           value={editor.title}
-          onChangeText={(title) => setEditor((current) => ({ ...current, title: sanitizeText(title, 60) }))}
+          onChangeText={(title) => setEditor((current) => ({ ...current, title: sanitizeTextInput(title, 60) }))}
           placeholder="e.g. Full Detail, Wheel Alignment, Bumper Repair"
           maxLength={60}
           errorText={errors.title}

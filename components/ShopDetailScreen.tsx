@@ -16,6 +16,8 @@ import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ServiceCard } from '@/components/ServiceCard';
 import { colors, spacing, typography } from '@/constants/theme';
+import { bookingTypesLabel, initialBookingMode } from '@/lib/booking-types';
+import { promptLeaveBooking } from '@/lib/booking-navigation';
 import { getVendorDetail } from '@/lib/vendors';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBookingDraftStore } from '@/store/useBookingDraftStore';
@@ -75,13 +77,11 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
     );
   }
 
-  const handleBook = () => {
+  const startBooking = () => {
+    if (!vendor.bookingModes?.length) return;
     clearDraft();
     setSubmittedGuestBooking(null);
-    // Seed a default booking mode at entry so the draft always carries a valid
-    // mode, even if the service step's effect hasn't run yet (the user can still
-    // change it there).
-    updateDraft({ vendorId: vendor.id, bookingMode: 'shop' });
+    updateDraft({ vendorId: vendor.id, bookingMode: initialBookingMode(vendor.bookingModes) });
     if (session) {
       router.push('/(client)/booking/vehicle');
       return;
@@ -89,6 +89,9 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
     setGuestMode(true);
     router.push(`/(public)/guest-booking/${vendor.id}/details`);
   };
+
+  // Starting over replaces any unfinished draft, so that has to be a choice.
+  const handleBook = () => promptLeaveBooking(startBooking);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -99,6 +102,7 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
           <Text style={typography.titleLg}>{vendor.name}</Text>
           <Text style={styles.meta}>Top rated · ⭐ {vendor.rating} ({vendor.reviewCount} reviews)</Text>
           <Text style={styles.description}>{vendor.description}</Text>
+          <Text style={styles.meta}>Booking type: {bookingTypesLabel(vendor.bookingModes ?? [])}</Text>
         </View>
 
         <SectionHeader title="Our Services" actionLabel="View all" onActionPress={() => setSheetOpen(true)} />
@@ -138,7 +142,8 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
 
       <View style={styles.footer}>
         <AppButton
-          label="Book Appointment"
+          label={vendor.bookingModes?.length ? "Book Appointment" : "Bookings unavailable"}
+          disabled={!vendor.bookingModes?.length}
           variant="accent"
           onPress={handleBook}
         />
@@ -148,7 +153,7 @@ export function ShopDetailScreen({ fallbackHref = '/(public)/discover' }: Props)
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
         vendorName={vendor.name}
-        mobileServiceEnabled={vendor.mobileServiceEnabled}
+        bookingModes={vendor.bookingModes ?? []}
         services={data?.services ?? []}
         onBook={() => {
           setSheetOpen(false);

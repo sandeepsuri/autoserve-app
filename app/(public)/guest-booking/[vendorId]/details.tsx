@@ -10,8 +10,13 @@ import { AppTextField } from '@/components/AppTextField';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { SearchablePicker } from '@/components/SearchablePicker';
+import { ServiceRemovalNotice } from '@/components/ServiceRemovalNotice';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { calculateBookingPrice } from '@/lib/booking-summary';
+import { BOOKING_TYPE_LABELS, ineligibleReason, isBookableMode } from '@/lib/booking-types';
+import { useBookingBack } from '@/lib/booking-navigation';
 import { addDays, startOfDay, toDateKey } from '@/lib/format';
+import { useBookingServiceReconciliation } from '@/lib/use-booking-service-reconciliation';
 import { guestBookingContactSchema, guestVehicleSchema, sanitizeText } from '@/lib/validation';
 import { listVehicleMakes, listVehicleModels, listVehicleYears } from '@/lib/vehicle-catalog';
 import { getVendorDetail } from '@/lib/vendors';
@@ -30,19 +35,32 @@ export default function GuestBookingDetailsScreen() {
   const router = useRouter();
   const { draft, updateDraft } = useBookingDraftStore();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const handleBack = useBookingBack({
+    exitsFlow: true,
+    back: () => {
+      if (router.canGoBack()) router.back();
+      else router.replace(`/(public)/shop/${vendorId}`);
+    },
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['guest-booking-vendor', vendorId],
     queryFn: () => getVendorDetail(vendorId),
     enabled: Boolean(vendorId),
   });
-  const { data: makes = [], isLoading: makesLoading } = useQuery({ queryKey: ['vehicle-makes'], queryFn: listVehicleMakes });
-  const { data: models = [], isLoading: modelsLoading } = useQuery({
+  const { data: makes = [], isFetching: makesLoading, error: makesError, refetch: retryMakes } = useQuery({
+    retry: false,
+    queryKey: ['vehicle-makes'],
+    queryFn: listVehicleMakes,
+  });
+  const { data: models = [], isFetching: modelsLoading, error: modelsError, refetch: retryModels } = useQuery({
+    retry: false,
     queryKey: ['vehicle-models', draft.vehicleMake],
     queryFn: () => listVehicleModels(draft.vehicleMake!),
     enabled: Boolean(draft.vehicleMake),
   });
-  const { data: years = [], isLoading: yearsLoading } = useQuery({
+  const { data: years = [], isFetching: yearsLoading, error: yearsError, refetch: retryYears } = useQuery({
+    retry: false,
     queryKey: ['vehicle-years', draft.vehicleMake, draft.vehicleModel],
     queryFn: () => listVehicleYears(draft.vehicleMake!, draft.vehicleModel!),
     enabled: Boolean(draft.vehicleMake && draft.vehicleModel),
@@ -51,31 +69,42 @@ export default function GuestBookingDetailsScreen() {
   const vendor = data?.vendor;
   const services = data?.services ?? [];
   const selectedServiceIds = draft.serviceIds ?? [];
-  const mode = draft.bookingMode ?? 'shop';
+  const modes = vendor?.bookingModes ?? [];
+  const mode = isBookableMode(modes, draft.bookingMode) ? draft.bookingMode : undefined;
+  useEffect(() => {
+    if (data && draft.bookingMode && !isBookableMode(data.vendor?.bookingModes ?? [], draft.bookingMode)) {
+      updateDraft({ bookingMode: undefined, scheduledDate: undefined, scheduledTime: undefined, mobileAddress: undefined });
+    }
+  }, [data, draft.bookingMode, updateDraft]);
+  const removalNotice = useBookingServiceReconciliation(data?.services);
   const dateOptions = useMemo(() => {
-    if (!data?.availability) return [];
+    if (!data?.availability || !mode) return [];
     return Array.from({ length: DATE_WINDOW }, (_, index) => toDateKey(addDays(startOfDay(new Date()), index + 1)))
       .filter((date) => deriveAvailableSlots(date, data.availability).length > 0);
-  }, [data?.availability]);
+  }, [data?.availability, mode]);
   const timeOptions = useMemo(
-    () => draft.scheduledDate && data?.availability ? deriveAvailableSlots(draft.scheduledDate, data.availability) : [],
-    [data?.availability, draft.scheduledDate],
+    () => mode && draft.scheduledDate && data?.availability ? deriveAvailableSlots(draft.scheduledDate, data.availability) : [],
+    [data?.availability, draft.scheduledDate, mode],
   );
 
+  // Both defaults need a vendor so a cleared draft stays cleared while this
+  // screen is still mounted during the transition out.
   useEffect(() => {
-    if (dateOptions.length && (!draft.scheduledDate || !dateOptions.includes(draft.scheduledDate))) {
+    if (draft.vendorId && dateOptions.length && (!draft.scheduledDate || !dateOptions.includes(draft.scheduledDate))) {
       updateDraft({ scheduledDate: dateOptions[0], scheduledTime: undefined });
     }
-  }, [dateOptions, draft.scheduledDate, updateDraft]);
+  }, [dateOptions, draft.scheduledDate, draft.vendorId, updateDraft]);
 
   useEffect(() => {
-    if (timeOptions.length && (!draft.scheduledTime || !timeOptions.includes(draft.scheduledTime))) {
+    if (draft.vendorId && timeOptions.length && (!draft.scheduledTime || !timeOptions.includes(draft.scheduledTime))) {
       updateDraft({ scheduledTime: timeOptions[0] });
     }
-  }, [draft.scheduledTime, timeOptions, updateDraft]);
+  }, [draft.scheduledTime, draft.vendorId, timeOptions, updateDraft]);
 
-  if (isLoading) return <Screen><AppHeader title="Guest booking" fallbackHref={`/(public)/shop/${vendorId}` as never} /></Screen>;
-  if (!vendor) return <Screen><AppHeader fallbackHref="/(public)/discover" /><EmptyState title="Vendor unavailable" body="Return to discovery and choose another provider." /></Screen>;
+  if (isLoading) return <Screen><AppHeader title="Guest booking" fallbackHref={`/(public)/shop/${vendorId}` as never} onBack={handleBack} /></Screen>;
+  if (!vendor) return <Screen><AppHeader fallbackHref="/(public)/discover" onBack={handleBack} /><EmptyState title="Vendor unavailable" body="Return to discovery and choose another provider." /></Screen>;
+
+  if (!modes.length) return <Screen><AppHeader fallbackHref={`/(public)/shop/${vendorId}` as never} onBack={handleBack} /><EmptyState title="Bookings unavailable" body="This vendor is not currently accepting Shop Visits or Mobile Service." /></Screen>;
 
   const toggleService = (serviceId: string) => {
     const next = selectedServiceIds.includes(serviceId)
@@ -93,6 +122,7 @@ export default function GuestBookingDetailsScreen() {
       trim: draft.vehicleTrim || undefined, color: draft.vehicleColor || undefined, plate: draft.vehiclePlate || undefined,
     });
     if (!vehicle.success) vehicle.error.issues.forEach((issue) => { nextErrors[String(issue.path[0])] = issue.message; });
+    if (!mode) nextErrors.bookingMode = 'Choose a currently available booking type.';
     if (!selectedServiceIds.length) nextErrors.services = 'Choose at least one service.';
     if (!draft.scheduledDate || !draft.scheduledTime) nextErrors.schedule = 'Choose an available date and time.';
     if (mode === 'mobile' && !draft.mobileAddress?.trim()) nextErrors.mobileAddress = 'Enter the mobile service address.';
@@ -100,12 +130,11 @@ export default function GuestBookingDetailsScreen() {
     if (!Object.keys(nextErrors).length) router.push(`/(public)/guest-booking/${vendorId}/review`);
   };
 
-  const subtotal = services.filter((service) => selectedServiceIds.includes(service.id)).reduce((sum, service) => sum + service.price, 0);
-  const total = subtotal * 1.12;
+  const { total } = calculateBookingPrice(services.filter((service) => selectedServiceIds.includes(service.id)));
 
   return (
     <Screen>
-      <AppHeader title="Guest booking · Step 1 of 2" subtitle="No account or saved garage required. These details are used for this request only." fallbackHref={`/(public)/shop/${vendor.id}` as never} />
+      <AppHeader title="Guest booking · Step 1 of 2" subtitle="No account or saved garage required. These details are used for this request only." fallbackHref={`/(public)/shop/${vendor.id}` as never} onBack={handleBack} />
       <View style={styles.progress}><View style={styles.progressActive} /><View style={styles.progressIdle} /></View>
       <AppCard style={styles.vendorCard}><Text style={typography.titleSm}>{vendor.name}</Text><Text style={styles.secondary}>{vendor.address}</Text></AppCard>
 
@@ -118,23 +147,25 @@ export default function GuestBookingDetailsScreen() {
 
       <AppCard style={styles.section}>
         <Text style={typography.titleSm}>Vehicle details</Text><Text style={styles.secondary}>This vehicle will not be saved to a profile or garage.</Text>
-        <SearchablePicker label="Make" required value={draft.vehicleMake ?? ''} options={makes} isLoading={makesLoading} errorText={errors.make} placeholder="Search or enter make" onChange={(value) => updateDraft({ vehicleMake: value, vehicleModel: undefined, vehicleYear: undefined })} />
-        <SearchablePicker label="Model" required value={draft.vehicleModel ?? ''} options={models} isLoading={modelsLoading} errorText={errors.model} placeholder="Search or enter model" disabled={!draft.vehicleMake} disabledHelperText="Choose a make first" onChange={(value) => updateDraft({ vehicleModel: value, vehicleYear: undefined })} />
-        <SearchablePicker label="Year" required value={draft.vehicleYear ?? ''} options={years} isLoading={yearsLoading} errorText={errors.year} placeholder="Search or enter year" disabled={!draft.vehicleModel} disabledHelperText="Choose a model first" onChange={(value) => updateDraft({ vehicleYear: value })} />
+        <SearchablePicker label="Make" required value={draft.vehicleMake ?? ''} options={makes} isLoading={makesLoading} loadError={makesError?.message} onRetry={() => { void retryMakes(); }} errorText={errors.make} placeholder="Search or enter make" onChange={(value) => updateDraft({ vehicleMake: value, vehicleModel: undefined, vehicleYear: undefined })} />
+        <SearchablePicker label="Model" required value={draft.vehicleModel ?? ''} options={models} isLoading={modelsLoading} loadError={modelsError?.message} onRetry={() => { void retryModels(); }} errorText={errors.model} placeholder="Search or enter model" disabled={!draft.vehicleMake} disabledHelperText="Choose a make first" onChange={(value) => updateDraft({ vehicleModel: value, vehicleYear: undefined })} />
+        <SearchablePicker label="Year" required value={draft.vehicleYear ?? ''} options={years} isLoading={yearsLoading} loadError={yearsError?.message} onRetry={() => { void retryYears(); }} errorText={errors.year} placeholder="Search or enter year" disabled={!draft.vehicleModel} disabledHelperText="Choose a model first" onChange={(value) => updateDraft({ vehicleYear: value })} />
         <AppTextField label="Trim" value={draft.vehicleTrim ?? ''} onChangeText={(text) => updateDraft({ vehicleTrim: sanitizeText(text, 60) })} placeholder="Optional" />
         <View style={styles.twoColumn}><View style={styles.flex}><AppTextField label="Colour" value={draft.vehicleColor ?? ''} onChangeText={(text) => updateDraft({ vehicleColor: sanitizeText(text, 30) })} placeholder="Optional" /></View><View style={styles.flex}><AppTextField label="License plate" value={draft.vehiclePlate ?? ''} onChangeText={(text) => updateDraft({ vehiclePlate: text.replace(/[<>]/g, '').slice(0, 12).toUpperCase() })} placeholder="Optional" autoCapitalize="characters" /></View></View>
       </AppCard>
 
       <AppCard style={styles.section}>
-        <Text style={typography.titleSm}>Service and visit type</Text>
+        <Text style={typography.titleSm}>Services and booking type</Text>
         {services.map((service) => {
           const active = selectedServiceIds.includes(service.id);
-          return <Pressable key={service.id} onPress={() => toggleService(service.id)} style={[styles.option, active && styles.optionActive]}><View style={styles.flex}><Text style={typography.labelLg}>{service.title}</Text><Text style={styles.secondary}>{service.durationMinutes} min</Text></View><Text style={styles.price}>${service.price.toFixed(2)}</Text></Pressable>;
+          const disabledReason = ineligibleReason(service, mode);
+          return <Pressable key={service.id} disabled={Boolean(disabledReason)} accessibilityRole="button" accessibilityState={{ selected: active, disabled: Boolean(disabledReason) }} onPress={() => toggleService(service.id)} style={[styles.option, active && styles.optionActive, disabledReason ? styles.optionDisabled : null]}><View style={styles.flex}><Text style={typography.labelLg}>{service.title}</Text><Text style={styles.secondary}>{service.durationMinutes} min</Text>{disabledReason ? <Text style={styles.disabledReason}>{disabledReason}</Text> : null}</View><Text style={styles.price}>${service.price.toFixed(2)}</Text></Pressable>;
         })}
+        <ServiceRemovalNotice message={removalNotice} />
         {errors.services ? <Text style={styles.error}>{errors.services}</Text> : null}
         <View style={styles.twoColumn}>
-          <ModeOption label="Shop visit" active={mode === 'shop'} onPress={() => updateDraft({ bookingMode: 'shop', mobileAddress: undefined })} />
-          {vendor.mobileServiceEnabled ? <ModeOption label="Mobile service" active={mode === 'mobile'} onPress={() => updateDraft({ bookingMode: 'mobile' })} /> : null}
+          {modes.map((option) => <ModeOption key={option} label={BOOKING_TYPE_LABELS[option]} active={mode === option} onPress={() => updateDraft({ bookingMode: option, scheduledDate: undefined, scheduledTime: undefined, mobileAddress: undefined })} />)}
+          {errors.bookingMode ? <Text style={styles.error}>{errors.bookingMode}</Text> : null}
         </View>
         {mode === 'mobile' ? <AppTextField label="Service address" required value={draft.mobileAddress ?? ''} errorText={errors.mobileAddress} onChangeText={(text) => updateDraft({ mobileAddress: sanitizeText(text, 160) })} /> : null}
       </AppCard>
@@ -162,7 +193,7 @@ function ModeOption({ label, active, onPress }: { label: string; active: boolean
 const styles = StyleSheet.create({
   progress: { flexDirection: 'row', gap: spacing.sm }, progressActive: { flex: 1, height: 5, borderRadius: radius.full, backgroundColor: colors.surfaceAccent }, progressIdle: { flex: 1, height: 5, borderRadius: radius.full, backgroundColor: colors.borderDefault },
   vendorCard: { backgroundColor: '#EEF6FC', gap: spacing.xs }, section: { gap: spacing.md }, secondary: { ...typography.bodyMd, color: colors.textSecondary },
-  twoColumn: { flexDirection: 'row', gap: spacing.md }, flex: { flex: 1 }, option: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: colors.borderDefault, borderRadius: radius.sm, padding: spacing.lg }, optionActive: { borderColor: colors.surfaceBrand, backgroundColor: '#F3F8FC' }, price: { ...typography.labelLg, color: colors.surfaceBrand },
+  twoColumn: { flexDirection: 'row', gap: spacing.md }, flex: { flex: 1 }, option: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: colors.borderDefault, borderRadius: radius.sm, padding: spacing.lg }, optionActive: { borderColor: colors.surfaceBrand, backgroundColor: '#F3F8FC' }, optionDisabled: { backgroundColor: colors.bgBase }, disabledReason: { ...typography.caption, color: colors.pending }, price: { ...typography.labelLg, color: colors.surfaceBrand },
   mode: { flex: 1, minHeight: 58, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.borderDefault, borderRadius: radius.sm, padding: spacing.md }, radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: colors.borderStrong }, radioActive: { borderColor: colors.surfaceBrand, backgroundColor: colors.surfaceBrand },
   fieldLabel: { ...typography.labelMd }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, chip: { borderWidth: 1, borderColor: colors.borderDefault, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.bgElevated }, chipActive: { backgroundColor: colors.surfaceBrand, borderColor: colors.surfaceBrand }, chipText: { ...typography.caption, color: colors.textSecondary }, chipTextActive: { color: colors.textInverse }, error: { ...typography.caption, color: colors.danger }, totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
 });

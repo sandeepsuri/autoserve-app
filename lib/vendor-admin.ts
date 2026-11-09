@@ -2,6 +2,9 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
 import { Service, VendorSummary } from '@/types/domain';
 
+import { getServiceEligibility } from './booking-types';
+import { mapServiceRow } from './service-records';
+import { requiredText } from './validation';
 import { isSupabaseConfigured, supabase } from './supabase';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -22,9 +25,13 @@ export async function getVendorForOwner(): Promise<VendorSummary | null> {
     .select('*')
     .eq('owner_id', ownerId)
     .eq('is_active', true)
+    .order('id', { ascending: true })
+    .limit(1)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error) throw error;
+  if (!data || data.owner_id !== ownerId || data.is_active !== true ||
+      useAuthStore.getState().session?.userId !== ownerId) return null;
 
   return {
     id: data.id,
@@ -36,6 +43,7 @@ export async function getVendorForOwner(): Promise<VendorSummary | null> {
     distanceMiles: data.distance_miles ?? 0,
     rating: data.rating ?? 0,
     reviewCount: data.review_count ?? 0,
+    locationMode: data.location_mode ?? undefined,
     mobileServiceEnabled: data.mobile_service_enabled ?? false,
     serviceRadiusMiles: data.service_radius_miles ?? 0,
     nextAvailable: data.next_available ?? '',
@@ -53,6 +61,7 @@ export async function getVendorForOwner(): Promise<VendorSummary | null> {
 
 export async function listVendorServices() {
   const ownerId = useAuthStore.getState().session?.userId;
+  if (!ownerId) return [];
   if (!isSupabaseConfigured || !supabase) {
     return useDemoDataStore.getState().services.filter((service) =>
       useDemoDataStore.getState().vendors.some((vendor) => vendor.id === service.vendorId && vendor.ownerId === ownerId)
@@ -62,25 +71,16 @@ export async function listVendorServices() {
   const vendor = await getVendorForOwner();
   if (!vendor) return [];
 
-  const servicesResult = await supabase.from('services').select('*').eq('vendor_id', vendor.id);
-  if (servicesResult.error || !servicesResult.data) {
-    return [];
-  }
+  const servicesResult = await supabase.from('services').select('*').eq('vendor_id', vendor.id)
+    .order('catalogue_order', { ascending: true }).order('id', { ascending: true });
+  if (servicesResult.error) throw servicesResult.error;
+  if (!servicesResult.data) return [];
 
-  return servicesResult.data.map((service) => ({
-    id: service.id,
-    vendorId: service.vendor_id,
-    title: service.title,
-    category: service.category,
-    description: service.description ?? undefined,
-    durationMinutes: service.duration_minutes,
-    price: service.price,
-    active: service.active ?? true,
-    image: service.image ?? undefined,
-  }));
+  return servicesResult.data.map(mapServiceRow);
 }
 
-export async function upsertVendorService(service: Service): Promise<Service> {
+export async function upsertVendorService(input: Service): Promise<Service> {
+  const service = { ...input, title: requiredText('Title', { min: 2, max: 60 }).parse(input.title) };
   if (!isSupabaseConfigured || !supabase) {
     useDemoDataStore.getState().upsertService(service);
     return service;
@@ -94,6 +94,7 @@ export async function upsertVendorService(service: Service): Promise<Service> {
     duration_minutes: service.durationMinutes,
     price: service.price,
     active: service.active,
+    booking_eligibility: getServiceEligibility(service),
     image: service.image ?? null,
   };
 
@@ -112,17 +113,7 @@ export async function upsertVendorService(service: Service): Promise<Service> {
     .single();
   if (error) throw error;
 
-  return {
-    id: data.id,
-    vendorId: data.vendor_id,
-    title: data.title,
-    category: data.category,
-    description: data.description ?? undefined,
-    durationMinutes: data.duration_minutes,
-    price: data.price,
-    active: data.active ?? true,
-    image: data.image ?? undefined,
-  };
+  return mapServiceRow(data);
 }
 
 export async function removeVendorService(serviceId: string) {

@@ -46,6 +46,8 @@ const toDbRow = (v: VendorSummary) => ({
   rating: v.rating,
   review_count: v.reviewCount,
   mobile_service_enabled: v.mobileServiceEnabled,
+  location_mode: v.locationMode,
+  booking_modes: v.bookingModes ?? (v.mobileServiceEnabled ? ['shop', 'mobile'] : ['shop']),
   service_radius_miles: v.serviceRadiusMiles,
   next_available: v.nextAvailable,
   hero_image: v.heroImage ?? null,
@@ -83,6 +85,15 @@ describe('listVendors — filtering', () => {
     expect(result[0].id).toBe('v1');
   });
 
+  it('mobile discovery uses current booking modes rather than the historical profile flag', async () => {
+    mockSupabaseRows([
+      makeVendor({ id: 'disabled-mobile', mobileServiceEnabled: true, bookingModes: ['shop'] }),
+      makeVendor({ id: 'mobile-only', mobileServiceEnabled: false, bookingModes: ['mobile'] }),
+      makeVendor({ id: 'neither', bookingModes: [] }),
+    ]);
+    expect((await listVendors({ mobileOnly: true })).map((v) => v.id)).toEqual(['mobile-only']);
+  });
+
   it('mobileOnly: false includes all vendors regardless of mobile flag', async () => {
     mockSupabaseRows([
       makeVendor({ id: 'v1', mobileServiceEnabled: true }),
@@ -116,14 +127,12 @@ describe('listVendors — filtering', () => {
     expect(await listVendors({ query: 'european' })).toHaveLength(1);
   });
 
-  it('maxDistanceMiles excludes vendors beyond the limit', async () => {
+  it('does not filter on the stored distance_miles, which ignores where the client is', async () => {
     mockSupabaseRows([
       makeVendor({ id: 'v1', distanceMiles: 5 }),
-      makeVendor({ id: 'v2', distanceMiles: 35 }),
+      makeVendor({ id: 'v2', distanceMiles: 3500 }),
     ]);
-    const result = await listVendors({ maxDistanceMiles: 10 });
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('v1');
+    expect(await listVendors()).toHaveLength(2);
   });
 
   it('combined filters apply intersection logic', async () => {
@@ -237,7 +246,7 @@ describe('active-vendor gating (ticket 06)', () => {
       call++;
       if (call === 1) return { select: jest.fn().mockReturnValue({ eq: eqId }) };
       if (call === 2) {
-        return makeChain({ eq: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ data: [] }) }) });
+        return makeChain({ eq: jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue(makeChain({ data: [] })) }) });
       }
       return makeChain({ eq: jest.fn().mockReturnValue({ order: jest.fn().mockResolvedValue({ data: [] }) }) });
     });
@@ -254,6 +263,7 @@ describe('getVendorDetail', () => {
       makeChain({
         eq: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
+            ...makeChain({ data: [] }),
             maybeSingle: jest.fn().mockResolvedValue({ data: null }),
           }),
           order: jest.fn().mockResolvedValue({ data: [], error: null }),
@@ -293,7 +303,7 @@ describe('getVendorDetail', () => {
         });
       }
       if (callCount === 2) {
-        return makeChain({ eq: jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ data: [serviceRow] }) }) });
+        return makeChain({ eq: jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue(makeChain({ data: [serviceRow] })) }) });
       }
       return makeChain({ eq: jest.fn().mockReturnValue({ order: jest.fn().mockResolvedValue({ data: [reviewRow] }) }) });
     });

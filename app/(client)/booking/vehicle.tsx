@@ -6,10 +6,14 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppHeader } from '@/components/AppHeader';
+import { BookingSelectionSummary } from '@/components/BookingSelectionSummary';
 import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { colors, radius, spacing, typography } from '@/constants/theme';
+import { useBookingBack } from '@/lib/booking-navigation';
+import { formatVehicleLabel } from '@/lib/booking-summary';
 import { listVehicles } from '@/lib/vehicles';
+import { getVendorDetail } from '@/lib/vendors';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBookingDraftStore } from '@/store/useBookingDraftStore';
 import { Vehicle } from '@/types/domain';
@@ -25,7 +29,19 @@ export default function BookingVehicleScreen() {
     queryFn: listVehicles,
   });
 
+  const { data: vendorDetail } = useQuery({
+    queryKey: ['booking-vendor-details', draft.vendorId],
+    queryFn: () => getVendorDetail(draft.vendorId!),
+    enabled: Boolean(draft.vendorId),
+  });
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const vendorId = draft.vendorId;
+  const handleBack = useBookingBack({
+    exitsFlow: true,
+    back: () => router.navigate(`/(client)/shop/${vendorId}`),
+  });
 
   useEffect(() => {
     if (isLoading) return;
@@ -40,7 +56,7 @@ export default function BookingVehicleScreen() {
   if (!session && !guestMode) {
     return (
       <Screen>
-        <AppHeader title="Select vehicle" fallbackHref="/(client)" />
+        <AppHeader title="Select vehicle" fallbackHref="/(client)" onBack={vendorId ? handleBack : undefined} />
         <EmptyState
           title="Sign in to continue"
           body="You need to be signed in to select a vehicle and complete a booking."
@@ -65,7 +81,7 @@ export default function BookingVehicleScreen() {
   if (isLoading) {
     return (
       <Screen scroll={false}>
-        <AppHeader title="Select vehicle" fallbackHref="/(client)" />
+        <AppHeader title="Select vehicle" fallbackHref="/(client)" onBack={handleBack} />
         <ActivityIndicator size="large" color={colors.surfaceAccent} style={styles.loader} />
       </Screen>
     );
@@ -84,6 +100,7 @@ export default function BookingVehicleScreen() {
           title="Select vehicle"
           subtitle="You need a saved vehicle before booking."
           fallbackHref="/(client)"
+          onBack={handleBack}
         />
         <EmptyState
           title="No vehicles saved yet"
@@ -103,12 +120,23 @@ export default function BookingVehicleScreen() {
     );
   }
 
+  const selectedVehicle = vehicles.find((vehicle) => vehicle.id === selectedId);
+  const selectedServices = (vendorDetail?.services ?? []).filter((service) => draft.serviceIds?.includes(service.id));
+
   return (
     <Screen>
       <AppHeader
         title="Select vehicle"
         subtitle="Choose the vehicle for this booking."
         fallbackHref="/(client)"
+        onBack={handleBack}
+      />
+
+      <BookingSelectionSummary
+        title="Your booking"
+        vendorName={vendorDetail?.vendor?.name ?? 'Selected vendor'}
+        vehicleLabel={selectedVehicle ? formatVehicleLabel(selectedVehicle) : 'Choose a vehicle below'}
+        services={selectedServices}
       />
 
       {vehicles.map((vehicle) => (

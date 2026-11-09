@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { getServiceEligibility, SERVICE_ELIGIBILITY_LABELS } from '@/lib/booking-types';
 import { Service } from '@/types/domain';
 import { colors, spacing, typography } from '@/constants/theme';
 
@@ -12,11 +13,13 @@ interface Props {
 }
 
 export function ServiceCard({ service, active, onPress }: Props) {
+  const eligibility = getServiceEligibility(service);
   return (
     <Pressable onPress={onPress} style={styles.wrapper}>
       <AppCard style={[styles.card, active && styles.active]}>
         <Text style={typography.titleSm} numberOfLines={2}>{service.title}</Text>
         <Text style={styles.meta} numberOfLines={1}>{service.durationMinutes} mins</Text>
+        {eligibility !== 'both' ? <Text style={styles.meta} numberOfLines={1}>{SERVICE_ELIGIBILITY_LABELS[eligibility]}</Text> : null}
         <View style={styles.footer}>
           <Text style={styles.price} numberOfLines={1}>${service.price}</Text>
           <Text style={styles.category} numberOfLines={1}>{service.category}</Text>

@@ -1,7 +1,11 @@
 import { ConfigContext, ExpoConfig } from 'expo/config';
 
-export default ({ config }: ConfigContext): ExpoConfig =>
-  ({
+import { resolveApiBaseUrl } from './lib/api-url';
+
+export default ({ config }: ConfigContext): ExpoConfig => {
+  const release = ['preview', 'production'].includes(process.env.EAS_BUILD_PROFILE ?? '') || process.env.NODE_ENV === 'production';
+  resolveApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL, release);
+  return ({
     ...config,
     android: {
       ...config.android,
@@ -13,3 +17,4 @@ export default ({ config }: ConfigContext): ExpoConfig =>
       },
     },
   } as ExpoConfig);
+};

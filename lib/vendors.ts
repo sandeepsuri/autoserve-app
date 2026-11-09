@@ -2,6 +2,8 @@ import { demoReviewsState, useDemoDataStore } from '@/store/useDemoDataStore';
 import { makeDefaultAvailability, makeEmptyAvailability } from '@/store/useVendorAvailabilityStore';
 import { DiscoveryFilters, Review, Service, VendorAvailability, VendorSummary } from '@/types/domain';
 
+import { getBookableModes } from './booking-types';
+import { mapServiceRow } from './service-records';
 import { loadVendorAvailability } from './vendor-availability';
 import { isDemoDataEnabled, isSupabaseConfigured, supabase } from './supabase';
 
@@ -14,14 +16,13 @@ const VENDOR_PUBLIC_VIEW = 'vendors_public';
 const VENDOR_PUBLIC_COLUMNS =
   'id,owner_id,business_type,name,description,address,distance_miles,rating,review_count,' +
   'mobile_service_enabled,service_radius_miles,next_available,hero_image,service_categories,' +
-  'latitude,longitude,business_hours,stripe_transfers_status,stripe_account_updated_at,is_active';
+  'latitude,longitude,business_hours,stripe_transfers_status,stripe_account_updated_at,is_active,location_mode,booking_modes';
 
 const defaultFilters: DiscoveryFilters = {
   query: '',
   mobileOnly: false,
   minimumRating: 0,
   category: 'all',
-  maxDistanceMiles: 30,
 };
 
 function mapVendorRow(item: Record<string, unknown>): VendorSummary {
@@ -35,6 +36,8 @@ function mapVendorRow(item: Record<string, unknown>): VendorSummary {
     distanceMiles: (item.distance_miles as number) ?? 0,
     rating: (item.rating as number) ?? 0,
     reviewCount: (item.review_count as number) ?? 0,
+    locationMode: (item.location_mode as VendorSummary['locationMode']) ?? undefined,
+    bookingModes: (item.booking_modes as VendorSummary['bookingModes']) ?? [],
     mobileServiceEnabled: (item.mobile_service_enabled as boolean) ?? false,
     serviceRadiusMiles: (item.service_radius_miles as number) ?? 0,
     nextAvailable: (item.next_available as string) ?? 'Schedule pending',
@@ -48,20 +51,6 @@ function mapVendorRow(item: Record<string, unknown>): VendorSummary {
     // (owner-only); see VENDOR_PUBLIC_COLUMNS.
     stripeTransfersStatus: (item.stripe_transfers_status as VendorSummary['stripeTransfersStatus'] | undefined) ?? undefined,
     stripeAccountUpdatedAt: (item.stripe_account_updated_at as string | undefined) ?? undefined,
-  };
-}
-
-function mapServiceRow(item: Record<string, unknown>): Service {
-  return {
-    id: item.id as string,
-    vendorId: item.vendor_id as string,
-    title: item.title as string,
-    category: item.category as Service['category'],
-    durationMinutes: item.duration_minutes as number,
-    price: item.price as number,
-    active: (item.active as boolean) ?? true,
-    description: item.description as string | undefined,
-    image: item.image as string | undefined,
   };
 }
 
@@ -84,19 +73,26 @@ function filterVendors(vendors: VendorSummary[], filters: DiscoveryFilters) {
       !filters.query ||
       vendor.name.toLowerCase().includes(filters.query.toLowerCase()) ||
       vendor.description.toLowerCase().includes(filters.query.toLowerCase());
-    const matchesMobile = !filters.mobileOnly || vendor.mobileServiceEnabled;
+    const matchesMobile = !filters.mobileOnly || vendor.bookingModes?.includes('mobile');
     const matchesRating = vendor.rating >= filters.minimumRating;
-    const matchesDistance = vendor.distanceMiles <= filters.maxDistanceMiles;
     const matchesCategory = filters.category === 'all' || vendor.serviceCategories.includes(filters.category);
 
-    return matchesQuery && matchesMobile && matchesRating && matchesDistance && matchesCategory;
+    return matchesQuery && matchesMobile && matchesRating && matchesCategory;
   });
 }
 
 export async function listVendors(filters: Partial<DiscoveryFilters> = {}) {
   const merged = { ...defaultFilters, ...filters };
   if (!isSupabaseConfigured || !supabase) {
-    return isDemoDataEnabled ? filterVendors(useDemoDataStore.getState().vendors, merged) : [];
+    const demo = useDemoDataStore.getState();
+    return isDemoDataEnabled ? filterVendors(demo.vendors.map((vendor) => ({
+      ...vendor,
+      bookingModes: getBookableModes(
+        vendor,
+        demo.vendorAvailabilities?.[vendor.id] ?? makeDefaultAvailability(),
+        demo.services.filter((item) => item.vendorId === vendor.id && item.active),
+      ),
+    })), merged) : [];
   }
 
   const { data, error } = await supabase.from(VENDOR_PUBLIC_VIEW).select(VENDOR_PUBLIC_COLUMNS).eq('is_active', true);
@@ -127,9 +123,10 @@ export async function getVendorDetail(vendorId: string): Promise<{
     const demo = useDemoDataStore.getState();
     const vendor = demo.vendors.find((item) => item.id === vendorId) ?? null;
     const demoAvailability = demo.vendorAvailabilities?.[vendorId] ?? makeDefaultAvailability();
+    const demoServices = demo.services.filter((item) => item.vendorId === vendorId && item.active);
     return {
-      vendor,
-      services: demo.services.filter((item) => item.vendorId === vendorId && item.active),
+      vendor: vendor ? { ...vendor, bookingModes: getBookableModes(vendor, demoAvailability, demoServices) } : null,
+      services: demoServices,
       reviews: demoReviewsState.filter((item) => item.vendorId === vendorId),
       businessHours: [] as { day: string; hours: string }[],
       availability: demoAvailability,
@@ -138,7 +135,8 @@ export async function getVendorDetail(vendorId: string): Promise<{
 
   const [vendorResult, servicesResult, reviewsResult, availability] = await Promise.all([
     supabase.from(VENDOR_PUBLIC_VIEW).select(VENDOR_PUBLIC_COLUMNS).eq('id', vendorId).eq('is_active', true).maybeSingle(),
-    supabase.from('services').select('*').eq('vendor_id', vendorId).eq('active', true),
+    supabase.from('services').select('*').eq('vendor_id', vendorId).eq('active', true)
+      .order('catalogue_order', { ascending: true }).order('id', { ascending: true }),
     supabase.from('reviews').select('*').eq('vendor_id', vendorId).order('created_at', { ascending: false }),
     // Client-facing: fall back to an empty (no-slot) availability so an
     // unconfigured vendor shows "no availability" instead of fabricated slots.
@@ -173,6 +171,7 @@ export async function getVendorDetail(vendorId: string): Promise<{
     ? (vendorRow.business_hours as { day: string; hours: string }[])
     : [];
   const services = (servicesResult.data ?? []).map(mapServiceRow);
+  vendor.bookingModes = getBookableModes(vendor, availability, services);
   const reviews = (reviewsResult.data ?? []).map(mapReviewRow);
 
   return { vendor, services, reviews, businessHours, availability };

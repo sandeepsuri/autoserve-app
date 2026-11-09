@@ -2,6 +2,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useDemoDataStore } from '@/store/useDemoDataStore';
 import { BookingMode, BookingRecord, BookingServiceSnapshot, Service, VendorSummary, Vehicle } from '@/types/domain';
 
+import { calculateBookingPrice, formatVehicleLabel } from './booking-summary';
+import { assertServicesEligible } from './booking-types';
 import { fetchProfileNamesByIds } from './profiles';
 import { extractEdgeFunctionError } from './edge-functions';
 import { isSupabaseConfigured, supabase } from './supabase';
@@ -243,7 +245,7 @@ export async function createBooking(input: Omit<BookingRecord, 'id' | 'createdAt
 export interface CreateBookingSelections {
   vendor: Pick<VendorSummary, 'id' | 'name'>;
   vehicle: Pick<Vehicle, 'id'> & Partial<Pick<Vehicle, 'make' | 'model' | 'year' | 'nickname'>>;
-  services: Pick<Service, 'id' | 'title' | 'category' | 'price' | 'durationMinutes'>[];
+  services: Pick<Service, 'id' | 'title' | 'category' | 'price' | 'durationMinutes' | 'bookingEligibility'>[];
   scheduledDate: string;
   scheduledTime: string;
   bookingMode: BookingMode;
@@ -265,7 +267,7 @@ export interface CreateGuestBookingSelections {
     plate?: string;
   };
   contact: { name: string; email: string; phone: string };
-  services: Pick<Service, 'id' | 'title' | 'category' | 'price' | 'durationMinutes'>[];
+  services: Pick<Service, 'id' | 'title' | 'category' | 'price' | 'durationMinutes' | 'bookingEligibility'>[];
   scheduledDate: string;
   scheduledTime: string;
   bookingMode: BookingMode;
@@ -275,6 +277,7 @@ export interface CreateGuestBookingSelections {
 }
 
 export async function createGuestBookingFromSelections(input: CreateGuestBookingSelections): Promise<BookingRecord> {
+  assertServicesEligible(input.services, input.bookingMode);
   const snapshot: BookingServiceSnapshot[] = input.services.map((service) => ({
     serviceId: service.id,
     title: service.title,
@@ -282,9 +285,7 @@ export async function createGuestBookingFromSelections(input: CreateGuestBooking
     price: service.price,
     durationMinutes: service.durationMinutes,
   }));
-  const subtotal = input.services.reduce((sum, service) => sum + service.price, 0);
-  const serviceFee = Math.round(subtotal * 0.12 * 100) / 100;
-  const total = Math.round((subtotal + serviceFee) * 100) / 100;
+  const { subtotal, serviceFee, total } = calculateBookingPrice(input.services);
   const vehicleLabel = `${input.vehicle.year} ${input.vehicle.make} ${input.vehicle.model}${input.vehicle.trim ? ` ${input.vehicle.trim}` : ''}`;
 
   if (!isSupabaseConfigured || !supabase) {
@@ -355,6 +356,7 @@ export async function createGuestBookingFromSelections(input: CreateGuestBooking
 
 export async function createBookingFromSelections(input: CreateBookingSelections): Promise<BookingRecord> {
   const { vendor, vehicle, services, scheduledDate, scheduledTime, bookingMode, mobileAddress, notes, photos, clientId, clientName } = input;
+  assertServicesEligible(services, bookingMode);
 
   if (!vehicle.id) {
     throw new Error('A vehicle is required to book a service.');
@@ -368,21 +370,15 @@ export async function createBookingFromSelections(input: CreateBookingSelections
     durationMinutes: s.durationMinutes,
   }));
 
-  const subtotal = services.reduce((sum, s) => sum + s.price, 0);
-  const serviceFee = Math.round(subtotal * 0.12 * 100) / 100;
-  const total = Math.round((subtotal + serviceFee) * 100) / 100;
+  const { subtotal, serviceFee, total } = calculateBookingPrice(services);
 
   let vehicleLabel: string | undefined;
   if (vehicle.year && vehicle.make && vehicle.model) {
-    const base = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
-    vehicleLabel = vehicle.nickname ? `${vehicle.nickname} (${base})` : base;
+    vehicleLabel = formatVehicleLabel({ year: vehicle.year, make: vehicle.make, model: vehicle.model, nickname: vehicle.nickname });
   } else {
     // id-only path: fetch saved vehicle for the label
     const saved = await getVehicleById(vehicle.id);
-    if (saved) {
-      const base = `${saved.year} ${saved.make} ${saved.model}`;
-      vehicleLabel = saved.nickname ? `${saved.nickname} (${base})` : base;
-    }
+    if (saved) vehicleLabel = formatVehicleLabel(saved);
   }
 
   return createBooking({

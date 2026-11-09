@@ -19,6 +19,12 @@ export function sanitizeText(value: string, maxLen?: number): string {
   return typeof maxLen === 'number' ? clampLength(cleaned, maxLen) : cleaned;
 }
 
+/** Removes unsafe characters without removing spaces while the user is typing. */
+export function sanitizeTextInput(value: string, maxLen?: number): string {
+  const cleaned = value.replace(/[\x00-\x1F\x7F<>]/g, '');
+  return typeof maxLen === 'number' ? clampLength(cleaned, maxLen) : cleaned;
+}
+
 /**
  * Sanitizes a human name field: applies `sanitizeText`, strips digits, and
  * only allows letters, spaces, and the common name punctuation `'-.&`.
